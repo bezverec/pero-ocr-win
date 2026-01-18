@@ -1,0 +1,36 @@
+# Windows-focused runtime dependencies for the wrapper scripts and PERO OCR workflows.
+# Install:
+#   python -m pip install -r win-requirements.txt
+#
+# NOTE: PyTorch (torch/torchvision/torchaudio) is NOT listed here on purpose.
+# On Windows you should install it using the official PyTorch "index-url" for your CUDA build.
+# See: win-docs/gpu-cuda-pytorch.md
+
+# --- Core scientific stack ---
+numpy>=1.24
+scipy>=1.10
+
+# --- Imaging / IO ---
+opencv-python>=4.8
+Pillow>=10.0
+imageio>=2.31
+
+# --- XML / parsing / utils ---
+lxml>=4.9
+regex>=2023.12
+tqdm>=4.66
+pyyaml>=6.0
+requests>=2.31
+
+# --- Configuration / validation helpers (used by our scripts) ---
+xmlschema>=3.3.1
+
+# --- Optional: faster XML parsing (safe to skip) ---
+# lxml already provides libxml2-backed parsing; keep this commented by default.
+# defusedxml>=0.7.1
+
+# --- Optional: Windows quality-of-life ---
+colorama>=0.4.6
+
+# If you use our line-cropping LMDB output (optional):
+# lmdb>=1.4.1
