@@ -50,7 +50,7 @@ introduced in ALTO 3.x and 4.x.
 All ALTO version conversions are handled by:
 
 ```
-win-scripts/win-alto_convert.py
+win-scripts/win_alto_convert.py
 ```
 
 ### Key properties
@@ -78,7 +78,7 @@ python win-scripts/win-alto_convert.py `
 ### Validate ALTO without writing output
 
 ```powershell
-python win-scripts/win-alto_convert.py `
+python win-scripts/win_alto_convert.py `
   output.alto.v4_4.xml `
   NUL `
   --to v4.4 `
@@ -169,16 +169,17 @@ For every target version:
 
 ## Related Scripts
 
-- `win-alto_to_txt.py` – ALTO → TXT (preserves blocks & empty lines)
-- `win-pagexml_to_txt.py` – PageXML → TXT
-- `win-parse_folder.py` – Windows-safe PERO OCR runner
+- `win_alto_to_txt.py` – ALTO → TXT (preserves blocks & empty lines)
+- `win_pagexml_to_txt.py` – PageXML → TXT
+- `win_parse_folder.py` – Windows-safe PERO OCR runner
 
 ---
 
 ## Summary
 
 - PERO OCR outputs valid ALTO 2.x
-- `win-alto_convert.py` enables **strict multi-version ALTO**
+- `win_alto_convert.py` enables **strict multi-version ALTO**
 - All conversions are **lossless**
 - Validation is first-class
 - Suitable for professional digitization pipelines
+
