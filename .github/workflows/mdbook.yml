@@ -1,0 +1,244 @@
+name: Deploy mdBook documentation to Pages
+
+on:
+  push:
+    branches: ["master"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      MDBOOK_VERSION: 0.4.36
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Create SUMMARY.md if missing
+        run: |
+          cd win-docs
+          if [ ! -f SUMMARY.md ]; then
+            cat > SUMMARY.md << 'EOF'
+            # Summary
+
+            [PERO OCR for Windows – Documentation Index](INDEX.md)
+
+            ## Installation & Environment
+            - [Windows installation](win-install.md)
+            - [GPU, CUDA and PyTorch setup](gpu-cuda-pytorch.md)
+
+            ## OCR Outputs & Formats
+            - [ALTO versions and conversion](alto-versions.md)
+
+            ## Practical Usage
+            - [Workflow examples (OCR → ALTO → TXT)](workflow-examples.md)
+
+            ## Project Context
+            - [About this fork and upstream project](README-upstream.md)
+            EOF
+          fi
+      
+      - name: Create mdbook.toml if missing
+        run: |
+          if [ ! -f mdbook.toml ]; then
+            cat > mdbook.toml << 'EOF'
+            [book]
+            title = "Pero OCR Windows - Documentation"
+            description = "Windows-focused fork of PERO OCR project"
+            authors = ["bezverec"]
+            src = "win-docs"
+
+            [build]
+            build-dir = "book"
+            create-missing = true
+
+            [output.html]
+            default-theme = "dark"
+            preferred-dark-theme = "dark"
+            site-url = "https://bezverec.github.io/pero-ocr-win/"
+            additional-css = ["custom.css"]
+            additional-js = ["custom.js"]
+
+            [preprocessor.links]
+            EOF
+          fi
+      
+      - name: Create custom CSS for code blocks
+        run: |
+          mkdir -p themes
+          cat > themes/custom.css << 'EOF'
+          /* Custom styles for Pero OCR documentation */
+          .md-typeset code {
+              background-color: rgba(0, 0, 0, 0.2);
+              border-radius: 4px;
+              padding: 0.2em 0.4em;
+          }
+          
+          .md-typeset pre > code {
+              background-color: #161b22;
+              border: 1px solid #30363d;
+              border-radius: 6px;
+          }
+          
+          .md-typeset table {
+              border: 1px solid #30363d;
+          }
+          
+          .md-typeset th {
+              background-color: #161b22;
+          }
+          
+          .md-typeset td, .md-typeset th {
+              border: 1px solid #30363d;
+          }
+          
+          /* Better PowerShell code highlighting */
+          .language-powershell .c, .language-powershell .c1 {
+              color: #6e7681;
+              font-style: italic;
+          }
+          
+          .language-powershell .k, .language-powershell .kd {
+              color: #ff7b72;
+          }
+          
+          .language-powershell .s, .language-powershell .s1 {
+              color: #a5d6ff;
+          }
+          
+          /* Navigation improvements */
+          .md-sidebar {
+              background-color: #0d1117;
+          }
+          
+          .md-nav__link--active {
+              color: #58a6ff;
+              font-weight: bold;
+          }
+          
+          /* Footer with GitHub link */
+          .md-footer {
+              border-top: 1px solid #30363d;
+          }
+          
+          .md-footer-meta {
+              background-color: #161b22;
+          }
+          
+          .github-link {
+              display: inline-block;
+              margin-top: 1rem;
+              padding: 0.5rem 1rem;
+              background-color: #238636;
+              color: white;
+              border-radius: 6px;
+              text-decoration: none;
+              font-weight: bold;
+          }
+          
+          .github-link:hover {
+              background-color: #2ea043;
+          }
+          EOF
+      
+      - name: Create custom JavaScript for GitHub banner
+        run: |
+          cat > themes/custom.js << 'EOF'
+          // Add GitHub banner to the page
+          document.addEventListener('DOMContentLoaded', function() {
+              // Create GitHub banner
+              const banner = document.createElement('div');
+              banner.className = 'github-banner';
+              banner.style.cssText = `
+                  background: linear-gradient(90deg, #161b22, #0d1117);
+                  border-bottom: 1px solid #30363d;
+                  padding: 10px 20px;
+                  display: flex;
+                  justify-content: space-between;
+                  align-items: center;
+                  color: #c9d1d9;
+              `;
+              
+              banner.innerHTML = `
+                  <div>
+                      <strong>Pero OCR Windows Documentation</strong>
+                      <div style="font-size: 0.9em; opacity: 0.8;">
+                          Windows-focused fork of PERO OCR project
+                      </div>
+                  </div>
+                  <a href="https://github.com/bezverec/pero-ocr-win" 
+                     class="github-link"
+                     style="color: white; text-decoration: none; padding: 8px 16px; background: #238636; border-radius: 6px;">
+                      View on GitHub
+                  </a>
+              `;
+              
+              // Insert banner at the top of the page
+              const container = document.querySelector('.md-container');
+              if (container) {
+                  container.insertBefore(banner, container.firstChild);
+              }
+              
+              // Add link to repository in footer
+              const footerMeta = document.querySelector('.md-footer-meta');
+              if (footerMeta) {
+                  const repoLink = document.createElement('a');
+                  repoLink.href = 'https://github.com/bezverec/pero-ocr-win';
+                  repoLink.className = 'md-footer-meta__link';
+                  repoLink.innerHTML = 'Pero OCR Windows Repository';
+                  repoLink.style.marginLeft = '1rem';
+                  footerMeta.appendChild(repoLink);
+              }
+          });
+          EOF
+      
+      - name: Install mdBook
+        run: |
+          curl --proto '=https' --tlsv1.2 https://sh.rustup.rs -sSf -y | sh
+          rustup update
+          cargo install --version ${MDBOOK_VERSION} mdbook
+      
+      - name: Build with mdBook
+        run: |
+          mdbook build --dest-dir ./book
+          
+          # Přidat redirect z root na dokumentaci
+          echo '<!DOCTYPE html>
+          <html lang="en">
+          <head>
+              <meta charset="UTF-8">
+              <title>Redirecting to Documentation</title>
+              <meta http-equiv="refresh" content="0; url=./book/">
+          </head>
+          <body>
+              <p>Redirecting to <a href="./book/">Pero OCR Windows Documentation</a></p>
+          </body>
+          </html>' > book/index.html
+      
+      - name: Setup Pages
+        id: pages
+        uses: actions/configure-pages@v5
+      
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./book
+
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
