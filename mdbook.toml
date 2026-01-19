@@ -1,0 +1,19 @@
+[book]
+title = "Pero OCR Windows - Documentation"
+description = "Windows-focused fork of PERO OCR project"
+authors = ["bezverec"]
+src = "win-docs"
+
+[build]
+build-dir = "book"
+create-missing = true
+
+[output.html]
+default-theme = "dark"
+preferred-dark-theme = "dark"
+site-url = "https://bezverec.github.io/pero-ocr-win/"
+additional-css = ["custom.css"]
+additional-js = ["custom.js"]
+
+[preprocessor.links]
+# Tento preprocessor zpracuje relativní odkazy mezi soubory
