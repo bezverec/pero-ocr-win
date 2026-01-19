@@ -4,7 +4,7 @@ This repository is a Windows-focused fork of the PERO OCR project.
 It provides a practical OCR pipeline for Windows 11, including
 GPU acceleration, ALTO XML output, ALTO version conversion and TXT export.
 
-All Windows-specific tools are prefixed with `win-`.
+All Windows-specific tools are prefixed with `win_` or `win-`.
 The upstream PERO OCR code is kept unmodified.
 
 ---
@@ -33,3 +33,4 @@ The upstream PERO OCR code is kept unmodified.
 - [ALTO Versions](alto-versions.md)
 - [Workflow Examples](workflow-examples.md)
 - [Upstream README](README-upstream.md)
+
