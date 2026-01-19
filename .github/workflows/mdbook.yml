@@ -26,202 +26,200 @@ jobs:
         run: |
           cd win-docs
           if [ ! -f SUMMARY.md ]; then
-            cat > SUMMARY.md << 'EOF'
-            # Summary
-
-            [PERO OCR for Windows – Documentation Index](INDEX.md)
-
-            ## Installation & Environment
-            - [Windows installation](win-install.md)
-            - [GPU, CUDA and PyTorch setup](gpu-cuda-pytorch.md)
-
-            ## OCR Outputs & Formats
-            - [ALTO versions and conversion](alto-versions.md)
-
-            ## Practical Usage
-            - [Workflow examples (OCR → ALTO → TXT)](workflow-examples.md)
-
-            ## Project Context
-            - [About this fork and upstream project](README-upstream.md)
-            EOF
+            echo '# Summary' > SUMMARY.md
+            echo '' >> SUMMARY.md
+            echo '[PERO OCR for Windows – Documentation Index](INDEX.md)' >> SUMMARY.md
+            echo '' >> SUMMARY.md
+            echo '## Installation & Environment' >> SUMMARY.md
+            echo '- [Windows installation](win-install.md)' >> SUMMARY.md
+            echo '- [GPU, CUDA and PyTorch setup](gpu-cuda-pytorch.md)' >> SUMMARY.md
+            echo '' >> SUMMARY.md
+            echo '## OCR Outputs & Formats' >> SUMMARY.md
+            echo '- [ALTO versions and conversion](alto-versions.md)' >> SUMMARY.md
+            echo '' >> SUMMARY.md
+            echo '## Practical Usage' >> SUMMARY.md
+            echo '- [Workflow examples (OCR → ALTO → TXT)](workflow-examples.md)' >> SUMMARY.md
+            echo '' >> SUMMARY.md
+            echo '## Project Context' >> SUMMARY.md
+            echo '- [About this fork and upstream project](README-upstream.md)' >> SUMMARY.md
           fi
       
       - name: Create mdbook.toml if missing
         run: |
           if [ ! -f mdbook.toml ]; then
             cat > mdbook.toml << 'EOF'
-            [book]
-            title = "Pero OCR Windows - Documentation"
-            description = "Windows-focused fork of PERO OCR project"
-            authors = ["bezverec"]
-            src = "win-docs"
+[book]
+title = "Pero OCR Windows - Documentation"
+description = "Windows-focused fork of PERO OCR project"
+authors = ["bezverec"]
+src = "win-docs"
 
-            [build]
-            build-dir = "book"
-            create-missing = true
+[build]
+build-dir = "book"
+create-missing = true
 
-            [output.html]
-            default-theme = "dark"
-            preferred-dark-theme = "dark"
-            site-url = "https://bezverec.github.io/pero-ocr-win/"
-            additional-css = ["custom.css"]
-            additional-js = ["custom.js"]
-
-            [preprocessor.links]
-            EOF
+[output.html]
+default-theme = "dark"
+preferred-dark-theme = "dark"
+site-url = "https://bezverec.github.io/pero-ocr-win/"
+EOF
           fi
       
-      - name: Create custom CSS for code blocks
+      - name: Create custom CSS
         run: |
           mkdir -p themes
-          cat > themes/custom.css << 'EOF'
-          /* Custom styles for Pero OCR documentation */
-          .md-typeset code {
-              background-color: rgba(0, 0, 0, 0.2);
-              border-radius: 4px;
-              padding: 0.2em 0.4em;
-          }
-          
-          .md-typeset pre > code {
-              background-color: #161b22;
-              border: 1px solid #30363d;
-              border-radius: 6px;
-          }
-          
-          .md-typeset table {
-              border: 1px solid #30363d;
-          }
-          
-          .md-typeset th {
-              background-color: #161b22;
-          }
-          
-          .md-typeset td, .md-typeset th {
-              border: 1px solid #30363d;
-          }
-          
-          /* Better PowerShell code highlighting */
-          .language-powershell .c, .language-powershell .c1 {
-              color: #6e7681;
-              font-style: italic;
-          }
-          
-          .language-powershell .k, .language-powershell .kd {
-              color: #ff7b72;
-          }
-          
-          .language-powershell .s, .language-powershell .s1 {
-              color: #a5d6ff;
-          }
-          
-          /* Navigation improvements */
-          .md-sidebar {
-              background-color: #0d1117;
-          }
-          
-          .md-nav__link--active {
-              color: #58a6ff;
-              font-weight: bold;
-          }
-          
-          /* Footer with GitHub link */
-          .md-footer {
-              border-top: 1px solid #30363d;
-          }
-          
-          .md-footer-meta {
-              background-color: #161b22;
-          }
-          
-          .github-link {
-              display: inline-block;
-              margin-top: 1rem;
-              padding: 0.5rem 1rem;
-              background-color: #238636;
-              color: white;
-              border-radius: 6px;
-              text-decoration: none;
-              font-weight: bold;
-          }
-          
-          .github-link:hover {
-              background-color: #2ea043;
-          }
-          EOF
-      
-      - name: Create custom JavaScript for GitHub banner
-        run: |
-          cat > themes/custom.js << 'EOF'
-          // Add GitHub banner to the page
-          document.addEventListener('DOMContentLoaded', function() {
-              // Create GitHub banner
-              const banner = document.createElement('div');
-              banner.className = 'github-banner';
-              banner.style.cssText = `
-                  background: linear-gradient(90deg, #161b22, #0d1117);
-                  border-bottom: 1px solid #30363d;
-                  padding: 10px 20px;
-                  display: flex;
-                  justify-content: space-between;
-                  align-items: center;
-                  color: #c9d1d9;
-              `;
-              
-              banner.innerHTML = `
-                  <div>
-                      <strong>Pero OCR Windows Documentation</strong>
-                      <div style="font-size: 0.9em; opacity: 0.8;">
-                          Windows-focused fork of PERO OCR project
-                      </div>
-                  </div>
-                  <a href="https://github.com/bezverec/pero-ocr-win" 
-                     class="github-link"
-                     style="color: white; text-decoration: none; padding: 8px 16px; background: #238636; border-radius: 6px;">
-                      View on GitHub
-                  </a>
-              `;
-              
-              // Insert banner at the top of the page
-              const container = document.querySelector('.md-container');
-              if (container) {
-                  container.insertBefore(banner, container.firstChild);
-              }
-              
-              // Add link to repository in footer
-              const footerMeta = document.querySelector('.md-footer-meta');
-              if (footerMeta) {
-                  const repoLink = document.createElement('a');
-                  repoLink.href = 'https://github.com/bezverec/pero-ocr-win';
-                  repoLink.className = 'md-footer-meta__link';
-                  repoLink.innerHTML = 'Pero OCR Windows Repository';
-                  repoLink.style.marginLeft = '1rem';
-                  footerMeta.appendChild(repoLink);
-              }
-          });
-          EOF
+          cat > themes/book.css << 'EOF'
+/* Custom styles for Pero OCR documentation */
+:root {
+  --md-primary-fg-color: #238636;
+  --md-primary-fg-color--light: #2ea043;
+  --md-primary-fg-color--dark: #1f6f3b;
+}
+
+.md-header {
+  background: linear-gradient(90deg, #161b22, #0d1117);
+  border-bottom: 1px solid #30363d;
+}
+
+.md-typeset code {
+  background-color: rgba(0, 0, 0, 0.2);
+  border-radius: 4px;
+  padding: 0.2em 0.4em;
+}
+
+.md-typeset pre > code {
+  background-color: #161b22;
+  border: 1px solid #30363d;
+  border-radius: 6px;
+}
+
+.md-typeset table {
+  border: 1px solid #30363d;
+  box-shadow: none;
+}
+
+.md-typeset th {
+  background-color: #161b22;
+}
+
+.md-typeset td, .md-typeset th {
+  border: 1px solid #30363d;
+}
+
+/* PowerShell syntax highlighting */
+.language-powershell .c, .language-powershell .c1 {
+  color: #6e7681;
+  font-style: italic;
+}
+
+.language-powershell .k, .language-powershell .kd {
+  color: #ff7b72;
+}
+
+.language-powershell .s, .language-powershell .s1 {
+  color: #a5d6ff;
+}
+
+/* GitHub banner */
+.github-banner {
+  background: linear-gradient(90deg, #161b22, #0d1117);
+  border-bottom: 1px solid #30363d;
+  padding: 1rem 2rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  color: #c9d1d9;
+}
+
+.github-link {
+  display: inline-block;
+  padding: 0.5rem 1rem;
+  background-color: #238636;
+  color: white !important;
+  border-radius: 6px;
+  text-decoration: none;
+  font-weight: bold;
+  transition: background-color 0.2s;
+}
+
+.github-link:hover {
+  background-color: #2ea043;
+  text-decoration: none;
+}
+
+/* Footer improvements */
+.md-footer {
+  border-top: 1px solid #30363d;
+}
+
+.md-footer-meta {
+  background-color: #161b22;
+}
+
+/* Better navigation */
+.md-nav__link--active {
+  color: var(--md-primary-fg-color);
+  font-weight: bold;
+}
+
+.md-nav__item .md-nav__link--active {
+  font-weight: bold;
+}
+EOF
       
       - name: Install mdBook
         run: |
-          curl --proto '=https' --tlsv1.2 https://sh.rustup.rs -sSf -y | sh
-          rustup update
+          curl -sSf https://sh.rustup.rs | sh -s -- -y
+          export PATH="$HOME/.cargo/bin:$PATH"
           cargo install --version ${MDBOOK_VERSION} mdbook
       
       - name: Build with mdBook
         run: |
+          export PATH="$HOME/.cargo/bin:$PATH"
           mdbook build --dest-dir ./book
           
-          # Přidat redirect z root na dokumentaci
-          echo '<!DOCTYPE html>
-          <html lang="en">
-          <head>
-              <meta charset="UTF-8">
-              <title>Redirecting to Documentation</title>
-              <meta http-equiv="refresh" content="0; url=./book/">
-          </head>
-          <body>
-              <p>Redirecting to <a href="./book/">Pero OCR Windows Documentation</a></p>
-          </body>
-          </html>' > book/index.html
+          # Add GitHub banner to index page
+          cat > book/banner.html << 'EOF'
+<div class="github-banner">
+  <div>
+    <strong style="font-size: 1.2em;">Pero OCR Windows Documentation</strong>
+    <div style="font-size: 0.9em; opacity: 0.8; margin-top: 0.25rem;">
+      Windows-focused fork of PERO OCR project
+    </div>
+  </div>
+  <a href="https://github.com/bezverec/pero-ocr-win" class="github-link">
+    View on GitHub
+  </a>
+</div>
+EOF
+          
+          # Add banner and CSS to all HTML files
+          for file in book/**/*.html; do
+            # Add banner after body tag
+            sed -i 's|<body>|<body>\n  <div class="github-banner">\n    <div>\n      <strong style="font-size: 1.2em;">Pero OCR Windows Documentation</strong>\n      <div style="font-size: 0.9em; opacity: 0.8; margin-top: 0.25rem;">\n        Windows-focused fork of PERO OCR project\n      </div>\n    </div>\n    <a href="https://github.com/bezverec/pero-ocr-win" class="github-link">\n      View on GitHub\n    </a>\n  </div>|' "$file"
+            
+            # Add custom CSS
+            sed -i 's|</head>|  <link rel="stylesheet" href="book.css">\n</head>|' "$file"
+          done
+          
+          # Copy custom CSS to book directory
+          cp themes/book.css book/
+          
+          # Create redirect from root
+          cat > book/../index.html << 'EOF'
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Redirecting to Documentation</title>
+    <meta http-equiv="refresh" content="0; url=./book/">
+    <link rel="canonical" href="https://bezverec.github.io/pero-ocr-win/book/">
+</head>
+<body>
+    <p>Redirecting to <a href="./book/">Pero OCR Windows Documentation</a></p>
+</body>
+</html>
+EOF
       
       - name: Setup Pages
         id: pages
@@ -230,7 +228,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: ./book
+          path: ./
 
   deploy:
     environment:
