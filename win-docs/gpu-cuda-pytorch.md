@@ -148,7 +148,7 @@ This includes:
 Example (Windows-safe script):
 
 ```powershell
-python win-scripts\win-parse_folder.py `
+python win-scripts\win_parse_folder.py `
   --config C:\models\pero\config.ini `
   --input-image-path C:\data\images `
   --output-xml-path C:\data\alto `
@@ -202,3 +202,4 @@ If GPU is correctly detected, logs will include:
 You now have a **fully functional GPU OCR setup on Windows**.
 
 ---
+
