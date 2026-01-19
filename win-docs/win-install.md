@@ -123,7 +123,7 @@ Use **Windows-compatible script**:
 
 For CPU:
 ```powershell
-python win-scripts\win-parse_folder.py `
+python win-scripts\win_parse_folder.py `
   --config C:\temp\pero\models\pero_eu_cz_print_newspapers_2022-09-26\config.ini `
   --input-image-path C:\temp\pero\in `
   --output-xml-path C:\temp\pero\out `
@@ -132,7 +132,7 @@ python win-scripts\win-parse_folder.py `
 
 For GPU:
 ```powershell
-python win-scripts\win-parse_folder.py `
+python win-scripts\win_parse_folder.py `
   --config C:\temp\pero\models\pero_eu_cz_print_newspapers_2022-09-26\config.ini `
   --input-image-path C:\temp\pero\in `
   --output-xml-path C:\temp\pero\out `
@@ -163,4 +163,5 @@ Further processing is described in:
 
 Next document:
 [**gpu-cuda-pytorch.md**](gpu-cuda-pytorch.md)
+
 
