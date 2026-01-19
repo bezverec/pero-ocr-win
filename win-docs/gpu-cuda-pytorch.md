@@ -202,4 +202,3 @@ If GPU is correctly detected, logs will include:
 You now have a **fully functional GPU OCR setup on Windows**.
 
 ---
-
