@@ -80,27 +80,11 @@ EOF
           # Přidat .nojekyll soubor pro GitHub Pages
           touch _site/.nojekyll
       
-      - name: Setup Pages
-        id: pages
-        uses: actions/configure-pages@v5
-      
-      - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: ./_site
-
-  deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    runs-on: ubuntu-latest
-    needs: build
-    steps:
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
       - name: Add custom CSS
         run: |
+          # Vytvořit složku pro CSS
+          mkdir -p _site/css
+          
           # Vytvořit custom CSS soubor
           cat > _site/css/custom.css << 'EOF'
           /* Custom styles for Pero OCR documentation */
@@ -130,9 +114,49 @@ EOF
             color: #6e7681;
             font-style: italic;
           }
+          
+          .language-powershell .k, .language-powershell .kd {
+            color: #ff7b72;
+          }
+          
+          .language-powershell .s, .language-powershell .s1 {
+            color: #a5d6ff;
+          }
+          
+          /* Table improvements */
+          .md-typeset table {
+            border: 1px solid #30363d;
+            box-shadow: none;
+          }
+          
+          .md-typeset th {
+            background-color: #161b22;
+          }
+          
+          .md-typeset td, .md-typeset th {
+            border: 1px solid #30363d;
+          }
           EOF
           
           # Přidat CSS do všech HTML souborů
-          for file in _site/**/*.html; do
-            sed -i 's|</head>|  <link rel="stylesheet" href="css/custom.css">\n</head>|' "$file"
-          done
+          find _site -name "*.html" -exec sed -i 's|</head>|  <link rel="stylesheet" href="css/custom.css">\n</head>|' {} \;
+      
+      - name: Setup Pages
+        id: pages
+        uses: actions/configure-pages@v5
+      
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./_site
+
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
