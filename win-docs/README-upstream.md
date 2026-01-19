@@ -113,7 +113,7 @@ git rebase upstream/master
 Windows-specific files live in:
 - `win-scripts/`
 - `win-requirements.txt`
-- `docs/`
+- `win-docs/`
 
 These files are expected to remain conflict-free.
 
@@ -166,3 +166,4 @@ All improvements are designed to be:
 ---
 
 End of document.
+
