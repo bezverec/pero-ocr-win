@@ -22,35 +22,48 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       
-      - name: Setup mdBook structure
+      - name: Setup Python for debugging
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+      
+      - name: Debug - list files before build
         run: |
-          # Vytvořit správnou strukturu pro mdBook
-          mkdir -p win-docs/src
+          echo "=== Current directory structure ==="
+          find . -type f -name "*.md" | head -20
+          echo ""
+          echo "=== win-docs directory ==="
+          ls -la win-docs/ || echo "win-docs not found"
+      
+      - name: Create simple mdbook structure
+        run: |
+          # Vytvořit src adresář
+          mkdir -p src
           
-          # Přesunout všechny .md soubory do src
-          cp win-docs/*.md win-docs/src/ 2>/dev/null || true
+          # Přesunout md soubory z win-docs do src
+          if [ -d "win-docs" ]; then
+            cp win-docs/*.md src/ 2>/dev/null || echo "No .md files to copy"
+          fi
           
-          # Vytvořit SUMMARY.md v src
-          cd win-docs/src
-          echo '# Summary' > SUMMARY.md
-          echo '' >> SUMMARY.md
-          echo '[PERO OCR for Windows – Documentation Index](INDEX.md)' >> SUMMARY.md
-          echo '' >> SUMMARY.md
-          echo '## Installation & Environment' >> SUMMARY.md
-          echo '- [Windows installation](win-install.md)' >> SUMMARY.md
-          echo '- [GPU, CUDA and PyTorch setup](gpu-cuda-pytorch.md)' >> SUMMARY.md
-          echo '' >> SUMMARY.md
-          echo '## OCR Outputs & Formats' >> SUMMARY.md
-          echo '- [ALTO versions and conversion](alto-versions.md)' >> SUMMARY.md
-          echo '' >> SUMMARY.md
-          echo '## Practical Usage' >> SUMMARY.md
-          echo '- [Workflow examples (OCR → ALTO → TXT)](workflow-examples.md)' >> SUMMARY.md
-          echo '' >> SUMMARY.md
-          echo '## Project Context' >> SUMMARY.md
-          echo '- [About this fork and upstream project](README-upstream.md)' >> SUMMARY.md
+          # Vytvořit SUMMARY.md
+          echo '# Summary' > src/SUMMARY.md
+          echo '' >> src/SUMMARY.md
+          echo '[PERO OCR for Windows – Documentation Index](INDEX.md)' >> src/SUMMARY.md
+          echo '' >> src/SUMMARY.md
+          echo '## Installation & Environment' >> src/SUMMARY.md
+          echo '- [Windows installation](win-install.md)' >> src/SUMMARY.md
+          echo '- [GPU, CUDA and PyTorch setup](gpu-cuda-pytorch.md)' >> src/SUMMARY.md
+          echo '' >> src/SUMMARY.md
+          echo '## OCR Outputs & Formats' >> src/SUMMARY.md
+          echo '- [ALTO versions and conversion](alto-versions.md)' >> src/SUMMARY.md
+          echo '' >> src/SUMMARY.md
+          echo '## Practical Usage' >> src/SUMMARY.md
+          echo '- [Workflow examples (OCR → ALTO → TXT)](workflow-examples.md)' >> src/SUMMARY.md
+          echo '' >> src/SUMMARY.md
+          echo '## Project Context' >> src/SUMMARY.md
+          echo '- [About this fork and upstream project](README-upstream.md)' >> src/SUMMARY.md
           
-          # Vytvořit mdbook.toml v win-docs
-          cd ..
+          # Vytvořit jednoduchý mdbook.toml v kořeni
           echo '[book]' > mdbook.toml
           echo 'title = "Pero OCR Windows - Documentation"' >> mdbook.toml
           echo 'description = "Windows-focused fork of PERO OCR project"' >> mdbook.toml
@@ -58,12 +71,10 @@ jobs:
           echo 'src = "src"' >> mdbook.toml
           echo '' >> mdbook.toml
           echo '[build]' >> mdbook.toml
-          echo 'build-dir = "_site"' >> mdbook.toml  # Změněno na relativní cestu
-          echo 'create-missing = true' >> mdbook.toml
+          echo 'build-dir = "book"' >> mdbook.toml  # Standardní mdBook výstup
           echo '' >> mdbook.toml
           echo '[output.html]' >> mdbook.toml
           echo 'default-theme = "dark"' >> mdbook.toml
-          echo 'preferred-dark-theme = "dark"' >> mdbook.toml
       
       - name: Install mdBook
         run: |
@@ -74,25 +85,70 @@ jobs:
       - name: Build with mdBook
         run: |
           export PATH="$HOME/.cargo/bin:$PATH"
-          cd win-docs
+          echo "=== Building mdBook ==="
           mdbook build
+          echo "=== Build completed ==="
       
-      - name: Add .nojekyll and prepare for deployment
+      - name: Debug - find mdBook output
         run: |
-          # Přesunout výstup z win-docs/_site do kořenového _site
+          echo "=== Looking for mdBook output ==="
+          find . -type d -name "book" -o -name "_site" -o -name "html" | head -10
+          echo ""
+          echo "=== Checking book directory ==="
+          if [ -d "book" ]; then
+            ls -la book/
+            echo "Book directory exists with $(find book -type f | wc -l) files"
+          else
+            echo "No 'book' directory found"
+          fi
+      
+      - name: Prepare for GitHub Pages
+        run: |
+          # Vytvořit _site adresář (co GitHub Pages očekává)
+          rm -rf _site
           mkdir -p _site
-          cp -r win-docs/_site/* _site/ 2>/dev/null || true
           
-          # Přidat .nojekyll soubor
+          # Zkopírovat výstup z mdBook do _site
+          if [ -d "book" ]; then
+            echo "Copying from 'book' directory"
+            cp -r book/* _site/
+          elif [ -d "_site" ]; then
+            echo "_site already exists"
+          else
+            echo "No output found, creating simple redirect"
+            echo '<!DOCTYPE html>
+            <html>
+            <head>
+                <title>Pero OCR Windows - Documentation</title>
+                <meta http-equiv="refresh" content="0; url=https://github.com/bezverec/pero-ocr-win/tree/master/win-docs">
+            </head>
+            <body>
+                <p>Redirecting to documentation on GitHub...</p>
+            </body>
+            </html>' > _site/index.html
+          fi
+          
+          # Přidat .nojekyll
           touch _site/.nojekyll
           
-          # Pokud _site je prázdný (mdbook možná vytvořil výstup jinde)
-          if [ ! "$(ls -A _site)" ]; then
-            echo "Checking for output in other locations..."
-            # Hledat mdbook output
-            find . -name "book" -type d | head -1 | xargs -I {} cp -r {} _site/ 2>/dev/null || true
-            find . -name "_site" -type d | head -1 | xargs -I {} cp -r {}/* _site/ 2>/dev/null || true
+          # Vytvořit proper index.html pokud neexistuje
+          if [ ! -f "_site/index.html" ]; then
+            echo "Creating index.html redirect"
+            echo '<!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="UTF-8">
+                <title>Redirecting</title>
+                <meta http-equiv="refresh" content="0; url=./">
+            </head>
+            <body>
+                <p>Redirecting...</p>
+            </body>
+            </html>' > _site/index.html
           fi
+          
+          echo "=== Final _site contents ==="
+          ls -la _site/
       
       - name: Setup Pages
         id: pages
