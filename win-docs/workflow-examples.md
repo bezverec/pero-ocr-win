@@ -156,9 +156,10 @@ for %f in (C:\temp\pero\out-alto-v4_4\*.xml) do (
 
 - Derived formats go to separate directories
 - Conversion is deterministic and reversible
-- Always keep the **original PERO ALTO** - Conversion is deterministic and reversible - Scripts are Windows-safe (no fcntl, no safe_gpu
+- Always keep the **original PERO ALTO** - Conversion is deterministic and reversible - Scripts are Windows-safe (no fcntl, no safe_gpu)
 ---
 
 Next document:
 [**README-upstream.md**](README-upstream.md)
+
 
