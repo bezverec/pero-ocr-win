@@ -7,14 +7,17 @@ from typing import List, Optional, Tuple
 
 WS_RE = re.compile(r"\s+")
 
+
 def norm_ws(s: str) -> str:
     return WS_RE.sub(" ", s).strip()
+
 
 def local_name(tag: str) -> str:
     # "{namespace}TextRegion" -> "TextRegion"
     if "}" in tag:
         return tag.split("}", 1)[1]
     return tag
+
 
 def parse_points(points: Optional[str]) -> List[Tuple[int, int]]:
     # "x,y x,y ..." -> [(x,y),...]
@@ -27,9 +30,10 @@ def parse_points(points: Optional[str]) -> List[Tuple[int, int]]:
         x, y = pair.split(",", 1)
         try:
             out.append((int(float(x)), int(float(y))))
-        except Exception:
+        except (ValueError, TypeError):
             pass
     return out
+
 
 def bbox_from_points(pts: List[Tuple[int, int]]) -> Optional[Tuple[int, int, int, int]]:
     if not pts:
@@ -38,16 +42,19 @@ def bbox_from_points(pts: List[Tuple[int, int]]) -> Optional[Tuple[int, int, int
     ys = [p[1] for p in pts]
     return (min(xs), min(ys), max(xs), max(ys))  # (x0,y0,x1,y1)
 
+
 def find_child(el: ET.Element, wanted_local: str) -> Optional[ET.Element]:
     for ch in list(el):
         if local_name(ch.tag) == wanted_local:
             return ch
     return None
 
+
 def iter_desc(el: ET.Element, wanted_local: str):
     for n in el.iter():
         if local_name(n.tag) == wanted_local:
             yield n
+
 
 def get_textline_text(tl: ET.Element) -> str:
     # Prefer TextEquiv/Unicode (PAGE)
@@ -57,6 +64,7 @@ def get_textline_text(tl: ET.Element) -> str:
         if uni is not None and (uni.text or "").strip():
             return norm_ws(uni.text or "")
     return ""
+
 
 def get_line_y(tl: ET.Element) -> int:
     # Prefer Baseline y (more stable), fallback to Coords bbox top
@@ -74,6 +82,7 @@ def get_line_y(tl: ET.Element) -> int:
             return bb[1]
     return 0
 
+
 def get_line_x(tl: ET.Element) -> int:
     coords = find_child(tl, "Coords")
     if coords is not None:
@@ -83,11 +92,13 @@ def get_line_x(tl: ET.Element) -> int:
             return bb[0]
     return 0
 
+
 @dataclass
 class Line:
     y: int
     x: int
     text: str
+
 
 @dataclass
 class Region:
@@ -97,6 +108,7 @@ class Region:
     x1: int
     y1: int
     lines: List[Line]
+
 
 def extract_regions(root: ET.Element) -> List[Region]:
     # PAGE root: PcGts/Page
@@ -125,7 +137,10 @@ def extract_regions(root: ET.Element) -> List[Region]:
                 b = bbox_from_points(parse_points(c.attrib.get("points")))
                 if not b:
                     continue
-                xs.append(b[0]); ys.append(b[1]); xe.append(b[2]); ye.append(b[3])
+                xs.append(b[0])
+                ys.append(b[1])
+                xe.append(b[2])
+                ye.append(b[3])
             if xs:
                 bb = (min(xs), min(ys), max(xe), max(ye))
             else:
@@ -143,6 +158,7 @@ def extract_regions(root: ET.Element) -> List[Region]:
             regions.append(Region(id=rid, x0=x0, y0=y0, x1=x1, y1=y1, lines=lines))
 
     return regions
+
 
 def sort_regions_reading_order(regions: List[Region]) -> List[Region]:
     """
@@ -179,6 +195,7 @@ def sort_regions_reading_order(regions: List[Region]) -> List[Region]:
         out.extend(row)
     return out
 
+
 def render_text(regions: List[Region], blank_line_between_regions: bool = True) -> str:
     out_lines: List[str] = []
     for reg in regions:
@@ -192,11 +209,14 @@ def render_text(regions: List[Region], blank_line_between_regions: bool = True) 
         out_lines.pop()
     return "\n".join(out_lines) + "\n"
 
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("pagexml", help="Cesta k PAGE XML (např. 1.xml)")
-    ap.add_argument("-o", "--out", help="Výstupní TXT (default: stejné jméno .txt vedle XML)")
-    ap.add_argument("--no-blank-lines", action="store_true", help="Nevkládat prázdný řádek mezi regiony")
+    ap.add_argument("-o", "--out",
+                    help="Výstupní TXT (default: stejné jméno .txt vedle XML)")
+    ap.add_argument("--no-blank-lines", action="store_true",
+                    help="Nevkládat prázdný řádek mezi regiony")
     args = ap.parse_args()
 
     in_path = args.pagexml
@@ -214,6 +234,7 @@ def main():
         f.write(text)
 
     print(f"OK: {out_path} (regions={len(regions)})")
+
 
 if __name__ == "__main__":
     main()
