@@ -17,9 +17,12 @@ Example working directory:
 
 ```text
 C:\temp\pero\
-├─ in\                 # input images
+├─ in\                    # input images
 │  └─ 0001.jpg
-├─ out\                # OCR outputs
+├─ out-pagexml\           # PageXML output
+├─ out-alto\              # PERO-native ALTO (v2.x)
+├─ out-alto-v4_4\         # converted ALTO (v4.4)
+├─ out-txt\               # derived TXT files
 ├─ models\
 │  └─ pero_eu_cz_print_newspapers_2022-09-26\
 │     └─ config.ini
@@ -30,9 +33,10 @@ C:\temp\pero\
 
 ---
 
-## Workflow 1: Image → ALTO (Default PERO Output)
+## Workflow 1: Image → ALTO + PageXML (Primary OCR Output)
 
-This is the **baseline OCR workflow**.
+This workflow demonstrates **explicit generation of both ALTO and PageXML**
+using a single PERO OCR run.
 
 ### Command
 
@@ -40,34 +44,40 @@ This is the **baseline OCR workflow**.
 python win-scripts\win-parse_folder.py `
   --config C:\temp\pero\models\pero_eu_cz_print_newspapers_2022-09-26\config.ini `
   --input-image-path C:\temp\pero\in `
-  --output-xml-path C:\temp\pero\out `
+  --output-xml-path C:\temp\pero\out-pagexml `
+  --output-alto-path C:\temp\pero\out-alto `
   --device gpu
 ```
 
 ### Output
 
 ```text
-out\
-└─ 0001.xml        # ALTO XML (default, PERO-native)
+out-pagexml\
+└─ 0001.xml          # PageXML
+
+out-alto\
+└─ 0001.xml          # ALTO XML (PERO-native, v2.x compatible)
 ```
 
-Notes:
-- This ALTO is usually **v2.x**
-- Structure: Page → PrintSpace → TextBlock → TextLine → String
-- Regions and reading order are preserved
+### Notes
+
+- `--output-xml-path` → **PageXML**
+- `--output-alto-path` → **ALTO**
+- Both outputs originate from the same OCR pipeline
+- Native ALTO should always be preserved
 
 ---
 
 ## Workflow 2: ALTO Version Conversion
 
-Convert PERO-generated ALTO into a **specific, strictly valid ALTO version**.
+Convert PERO-native ALTO into a **specific, strictly valid ALTO version**.
 
-### Example: v2.1 → v4.4
+### Example: v2.x → v4.4
 
 ```powershell
 python win-scripts\win-alto_convert.py `
-  C:\temp\pero\out\0001.xml `
-  C:\temp\pero\out\0001.alto.v4_4.xml `
+  C:\temp\pero\out-alto\0001.xml `
+  C:\temp\pero\out-alto-v4_4\0001.xml `
   --to v4.4 `
   --pretty
 ```
@@ -76,22 +86,11 @@ python win-scripts\win-alto_convert.py `
 
 ```powershell
 python win-scripts\win-alto_convert.py `
-  C:\temp\pero\out\0001.alto.v4_4.xml `
+  C:\temp\pero\out-alto-v4_4\0001.xml `
   NUL `
   --to v4.4 `
   --validate-only
 ```
-
-Supported targets:
-- v2.0
-- v2.1
-- v3.0
-- v3.1
-- v4.0
-- v4.1
-- v4.2
-- v4.3
-- v4.4
 
 ---
 
@@ -103,60 +102,41 @@ Extract text from ALTO **while respecting layout blocks**.
 
 ```powershell
 python win-scripts\win-alto_to_txt.py `
-  C:\temp\pero\out\0001.alto.v4_4.xml `
-  C:\temp\pero\out\0001.txt `
+  C:\temp\pero\out-alto-v4_4\0001.xml `
+  C:\temp\pero\out-txt\0001.txt `
   --paragraphs
 ```
-
-### Result
-
-```text
-Paragraph 1 text line 1
-Paragraph 1 text line 2
-
-Paragraph 2 text line 1
-Paragraph 2 text line 2
-```
-
-Rules:
-- Empty line = block / region break
-- Line order preserved
-- Suitable for further NLP / indexing
 
 ---
 
 ## Workflow 4: PageXML → TXT
 
-If PERO is configured to emit PageXML:
+Convert PageXML directly to text (layout-aware).
 
 ```powershell
 python win-scripts\win-pagexml_to_txt.py `
-  C:\temp\pero\out\0001.page.xml `
-  C:\temp\pero\out\0001.txt `
+  C:\temp\pero\out-pagexml\0001.xml `
+  C:\temp\pero\out-txt\0001.page.txt `
   --paragraphs
 ```
-
-Use when:
-- Working with PAGE-based pipelines
-- Integrating with Transkribus-like tools
 
 ---
 
 ## Workflow 5: Batch Processing
 
-### Convert all ALTO files to v4.4
+### Convert all PERO ALTO files to ALTO v4.4
 
 ```powershell
-for %f in (C:\temp\pero\out\*.xml) do (
-  python win-scripts\win-alto_convert.py "%f" "%f.v4_4.xml" --to v4.4
+for %f in (C:\temp\pero\out-alto\*.xml) do (
+  python win-scripts\win-alto_convert.py "%f" "C:\temp\pero\out-alto-v4_4\%~nxf" --to v4.4
 )
 ```
 
-### Convert all ALTO v4.4 to TXT
+### Convert all ALTO v4.4 files to TXT
 
 ```powershell
-for %f in (C:\temp\pero\out\*.v4_4.xml) do (
-  python win-scripts\win-alto_to_txt.py "%f" "%f.txt" --paragraphs
+for %f in (C:\temp\pero\out-alto-v4_4\*.xml) do (
+  python win-scripts\win-alto_to_txt.py "%f" "C:\temp\pero\out-txt\%~nf.txt" --paragraphs
 )
 ```
 
@@ -164,21 +144,21 @@ for %f in (C:\temp\pero\out\*.v4_4.xml) do (
 
 ## Recommended Archival Workflow
 
-1. OCR → **native PERO ALTO**
-2. Convert → **ALTO v4.4 (strict)**
+1. OCR → **out-alto** (PERO-native, immutable)
+2. Convert → **out-alto-v4_4**
 3. Validate
-4. Derive TXT / derivatives
-5. Preserve original + converted ALTO
+4. Derive TXT → **out-txt**
+5. Preserve all XML layers
 
 ---
 
 ## Notes
 
-- Always keep the **original PERO ALTO**
+- Derived formats go to separate directories
 - Conversion is deterministic and reversible
-- Scripts are Windows-safe (no fcntl, no safe_gpu)
-
+- Always keep the **original PERO ALTO** - Conversion is deterministic and reversible - Scripts are Windows-safe (no fcntl, no safe_gpu
 ---
 
 Next document:
-**README-upstream.md**
+[**README-upstream.md**](README-upstream.md)
+
