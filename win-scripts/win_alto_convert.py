@@ -122,11 +122,15 @@ def detect_ns(tree: etree._ElementTree) -> str:
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("input_xml", help="Input ALTO XML")
-    ap.add_argument("output_xml", help="Output ALTO XML (use NUL on Windows for validate-only)")
-    ap.add_argument("--to", required=True, choices=list(SPECS.keys()), help="Target ALTO version")
-    ap.add_argument("--validate-only", action="store_true", help="Only validate (no conversion)")
+    ap.add_argument("output_xml",
+                    help="Output ALTO XML (use NUL on Windows for validate-only)")
+    ap.add_argument("--to", required=True, choices=list(SPECS.keys()),
+                    help="Target ALTO version")
+    ap.add_argument("--validate-only", action="store_true",
+                    help="Only validate (no conversion)")
     ap.add_argument("--pretty", action="store_true", help="Pretty-print XML")
-    ap.add_argument("--no-cache", action="store_true", help="Do not use cached XSDs (force re-download)")
+    ap.add_argument("--no-cache", action="store_true",
+                    help="Do not use cached XSDs (force re-download)")
     args = ap.parse_args()
 
     spec = SPECS[args.to]
