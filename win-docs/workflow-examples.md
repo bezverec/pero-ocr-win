@@ -41,7 +41,7 @@ using a single PERO OCR run.
 ### Command
 
 ```powershell
-python win-scripts\win-parse_folder.py `
+python win-scripts\win_parse_folder.py `
   --config C:\temp\pero\models\pero_eu_cz_print_newspapers_2022-09-26\config.ini `
   --input-image-path C:\temp\pero\in `
   --output-xml-path C:\temp\pero\out-pagexml `
@@ -75,7 +75,7 @@ Convert PERO-native ALTO into a **specific, strictly valid ALTO version**.
 ### Example: v2.x → v4.4
 
 ```powershell
-python win-scripts\win-alto_convert.py `
+python win-scripts\win_alto_convert.py `
   C:\temp\pero\out-alto\0001.xml `
   C:\temp\pero\out-alto-v4_4\0001.xml `
   --to v4.4 `
@@ -85,7 +85,7 @@ python win-scripts\win-alto_convert.py `
 ### Validation Only
 
 ```powershell
-python win-scripts\win-alto_convert.py `
+python win-scripts\win_alto_convert.py `
   C:\temp\pero\out-alto-v4_4\0001.xml `
   NUL `
   --to v4.4 `
@@ -101,7 +101,7 @@ Extract text from ALTO **while respecting layout blocks**.
 ### Command
 
 ```powershell
-python win-scripts\win-alto_to_txt.py `
+python win-scripts\win_alto_to_txt.py `
   C:\temp\pero\out-alto-v4_4\0001.xml `
   C:\temp\pero\out-txt\0001.txt `
   --paragraphs
@@ -114,7 +114,7 @@ python win-scripts\win-alto_to_txt.py `
 Convert PageXML directly to text (layout-aware).
 
 ```powershell
-python win-scripts\win-pagexml_to_txt.py `
+python win-scripts\win_pagexml_to_txt.py `
   C:\temp\pero\out-pagexml\0001.xml `
   C:\temp\pero\out-txt\0001.page.txt `
   --paragraphs
@@ -134,7 +134,7 @@ New-Item -ItemType Directory -Force -Path $outDir | Out-Null
 
 Get-ChildItem $inDir -Filter *.xml | ForEach-Object {
     $outFile = Join-Path $outDir $_.Name
-    python win-scripts\win-alto_convert.py `
+    python win-scripts\win_alto_convert.py `
         "$($_.FullName)" `
         "$outFile" `
         --to v4.4
@@ -151,7 +151,7 @@ New-Item -ItemType Directory -Force -Path $outDir | Out-Null
 
 Get-ChildItem $inDir -Filter *.xml | ForEach-Object {
     $outFile = Join-Path $outDir ($_.BaseName + ".txt")
-    python win-scripts\win-alto_to_txt.py `
+    python win-scripts\win_alto_to_txt.py `
         "$($_.FullName)" `
         "$outFile" `
         --paragraphs
@@ -179,6 +179,7 @@ Get-ChildItem $inDir -Filter *.xml | ForEach-Object {
 
 Next document:
 [**README-upstream.md**](README-upstream.md)
+
 
 
 
