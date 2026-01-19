@@ -53,10 +53,10 @@ Instead:
 
 | Purpose | Script |
 |------|-------|
-| OCR runner | `win-parse_folder.py` |
-| ALTO conversion | `win-alto_convert.py` |
-| ALTO → TXT | `win-alto_to_txt.py` |
-| PageXML → TXT | `win-pagexml_to_txt.py` |
+| OCR runner | `win_parse_folder.py` |
+| ALTO conversion | `win_alto_convert.py` |
+| ALTO → TXT | `win_alto_to_txt.py` |
+| PageXML → TXT | `win_pagexml_to_txt.py` |
 
 This guarantees:
 - clean rebase on upstream
@@ -166,4 +166,5 @@ All improvements are designed to be:
 ---
 
 End of document.
+
 
