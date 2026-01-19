@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+"""
+Main script for processing OCR documents with pero_ocr.
+"""
 
 import argparse
 import configparser
@@ -11,11 +14,14 @@ import sys
 import time
 import traceback
 from multiprocessing import Pool
-from typing import List, Optional, Set
+from typing import Dict, List, Optional, Set, Tuple
 
 import cv2
 import numpy as np
 import torch
+
+from pero_ocr.core.layout import PageLayout
+from pero_ocr.document_ocr.page_parser import PageParser
 
 # --- Windows-safe optional import of safe_gpu (POSIX-only) --------------------
 _SAFE_GPU_AVAILABLE = False
@@ -30,169 +36,239 @@ try:
 except ImportError:
     _SAFE_GPU_AVAILABLE = False
     SAFE_GPU = None
-
-from pero_ocr import utils  # noqa: F401 -- there is code executed upon import here.
-from pero_ocr.core.layout import PageLayout
-from pero_ocr.document_ocr.page_parser import PageParser
+# ------------------------------------------------------------------------------
 
 
-def parse_arguments():
-    """Parse command line arguments."""
-    parser = argparse.ArgumentParser()
-    parser.add_argument('-c', '--config', required=True,
-                        help='Path to input config file.')
-    parser.add_argument('-s', '--skip-processed', action='store_true',
-                        required=False,
-                        help='If set, already processed files are skipped.')
-    parser.add_argument('-i', '--input-image-path', help='')
-    parser.add_argument('-x', '--input-xml-path', help='')
-    parser.add_argument('--input-logit-path', help='')
-    parser.add_argument('--output-xml-path', help='')
-    parser.add_argument('--output-render-path', help='')
-    parser.add_argument('--output-line-path', help='')
-    parser.add_argument('--output-logit-path', help='')
-    parser.add_argument('--output-alto-path', help='')
-    parser.add_argument('--output-transcriptions-file-path', help='')
-    parser.add_argument('--skipp-missing-xml', action='store_true',
-                        help='Skip images which have missing xml.')
+class ArgumentParser:
+    """Parser for command line arguments."""
 
-    parser.add_argument('--device', choices=["gpu", "cpu"], default="gpu")
-    parser.add_argument(
-        '--gpu-id',
-        type=int,
-        default=None,
-        help=('If set, the computation runs on the specified GPU. '
-              'If not set and --device=gpu, safe-gpu is used on POSIX '
-              '(if available); on Windows it falls back to cuda:0 '
-              '(or default cuda).')
-    )
+    @staticmethod
+    def parse() -> argparse.Namespace:
+        """Parse and return command line arguments."""
+        parser = argparse.ArgumentParser()
+        parser.add_argument('-c', '--config', required=True,
+                            help='Path to input config file.')
+        parser.add_argument('-s', '--skip-processed', action='store_true',
+                            help='Skip already processed files.')
+        parser.add_argument('-i', '--input-image-path', help='Image path')
+        parser.add_argument('-x', '--input-xml-path', help='XML path')
+        parser.add_argument('--input-logit-path', help='Logit path')
+        parser.add_argument('--output-xml-path', help='Output XML path')
+        parser.add_argument('--output-render-path', help='Render path')
+        parser.add_argument('--output-line-path', help='Line image path')
+        parser.add_argument('--output-logit-path', help='Output logit path')
+        parser.add_argument('--output-alto-path', help='ALTO output path')
+        parser.add_argument('--output-transcriptions-file-path',
+                            help='Transcriptions file path')
+        parser.add_argument('--skipp-missing-xml', action='store_true',
+                            help='Skip images with missing XML.')
 
-    parser.add_argument('--process-count', type=int, default=1,
-                        help='Number of parallel processes (works mostly '
-                        'only for line cropping).')
-    return parser.parse_args()
+        parser.add_argument('--device', choices=["gpu", "cpu"], default="gpu")
+        parser.add_argument(
+            '--gpu-id',
+            type=int,
+            default=None,
+            help='GPU ID to use (if not set, uses safe-gpu on POSIX)'
+        )
 
-
-def setup_logging(config):
-    """Configure logging based on config."""
-    level = config.get('LOGGING_LEVEL', fallback='WARNING')
-    level = logging.getLevelName(level)
-
-    logging.basicConfig(
-        format='[%(levelname)s] %(asctime)s - %(name)s - %(message)s',
-        level=level
-    )
-
-    logger = logging.getLogger('pero_ocr')
-    logger.setLevel(level)
+        parser.add_argument('--process-count', type=int, default=1,
+                            help='Number of parallel processes.')
+        return parser.parse_args()
 
 
-def get_value_or_none(config, section, key):
-    """Get value from config or None if not present."""
-    if config.has_option(section, key):
-        return config[section][key]
-    return None
+class ConfigManager:
+    """Manages configuration loading and updates."""
+
+    def __init__(self, config_path: str):
+        self.config_path = config_path
+        self.config = configparser.ConfigParser()
+        self._load_config()
+
+    def _load_config(self):
+        """Load configuration from file."""
+        if not os.path.isfile(self.config_path):
+            raise FileNotFoundError(
+                f'Config file does not exist: "{self.config_path}".'
+            )
+        self.config.read(self.config_path)
+
+        if 'PARSE_FOLDER' not in self.config:
+            self.config.add_section('PARSE_FOLDER')
+
+    def update_from_args(self, args: argparse.Namespace):
+        """Update configuration with command line arguments."""
+        arg_mapping = {
+            'INPUT_IMAGE_PATH': args.input_image_path,
+            'INPUT_XML_PATH': args.input_xml_path,
+            'INPUT_LOGIT_PATH': args.input_logit_path,
+            'OUTPUT_XML_PATH': args.output_xml_path,
+            'OUTPUT_RENDER_PATH': args.output_render_path,
+            'OUTPUT_LINE_PATH': args.output_line_path,
+            'OUTPUT_LOGIT_PATH': args.output_logit_path,
+            'OUTPUT_ALTO_PATH': args.output_alto_path,
+        }
+
+        for key, value in arg_mapping.items():
+            if value is not None:
+                self.config['PARSE_FOLDER'][key] = value
+
+    def get_value(self, section: str, key: str) -> Optional[str]:
+        """Get value from config or None if not present."""
+        if self.config.has_option(section, key):
+            return self.config[section][key]
+        return None
 
 
-def create_dir_if_not_exists(path):
-    """Create directory if it doesn't exist."""
-    if not os.path.exists(path):
-        os.makedirs(path)
+class LoggingConfig:
+    """Configures logging."""
+
+    @staticmethod
+    def setup(config: configparser.SectionProxy):
+        """Setup logging based on config."""
+        level = config.get('LOGGING_LEVEL', fallback='WARNING')
+        level = logging.getLevelName(level)
+
+        logging.basicConfig(
+            format='[%(levelname)s] %(asctime)s - %(name)s - %(message)s',
+            level=level
+        )
+
+        logger = logging.getLogger('pero_ocr')
+        logger.setLevel(level)
 
 
-def load_already_processed_files_in_directory(
-    directory: Optional[str]
-) -> Set[str]:
-    """Load set of already processed files from directory."""
-    already_processed = set()
+class DeviceManager:
+    """Manages device selection (CPU/GPU)."""
 
-    if directory is not None:
-        file_pattern = r"(.+?)(\.logits|\.xml|\.jpg)"
-        regex = re.compile(file_pattern)
+    @staticmethod
+    def get_device(device: str, gpu_index: Optional[int] = None,
+                   logger: Optional[logging.Logger] = None) -> torch.device:
+        """
+        Get appropriate device for computation.
+        """
+        if device != "gpu":
+            return torch.device("cpu")
 
-        for file in os.listdir(directory):
-            matched = regex.match(file)
-            if matched:
-                already_processed.add(matched.groups()[0])
-
-    return already_processed
-
-
-def load_already_processed_files(
-    directories: List[Optional[str]]
-) -> Set[str]:
-    """Load intersection of already processed files from multiple directories."""
-    already_processed = set()
-    first = True
-
-    for directory in directories:
-        if directory is not None:
-            files = load_already_processed_files_in_directory(directory)
-
-            if first:
-                already_processed = files
-                first = False
-            else:
-                already_processed = already_processed.intersection(files)
-
-    return already_processed
-
-
-def get_device(
-    device: str,
-    gpu_index: Optional[int] = None,
-    logger: Optional[logging.Logger] = None
-):
-    """
-    Windows-safe device selection.
-
-    - If device == "cpu": always CPU.
-    - If gpu_index is provided: use that CUDA device (cuda:<id>).
-    - Else if device == "gpu":
-        - If CUDA not available: warn and fallback to CPU.
-        - If safe_gpu is available (POSIX only): claim a GPU and use default 'cuda'.
-        - Else (Windows or safe_gpu missing): use default 'cuda'.
-    """
-    if device != "gpu":
-        return torch.device("cpu")
-
-    if not torch.cuda.is_available():
-        if logger:
-            logger.warning("CUDA not available. Falling back to CPU.")
-        return torch.device("cpu")
-
-    if gpu_index is not None:
-        return torch.device(f"cuda:{gpu_index}")
-
-    # No explicit GPU index: try safe_gpu on POSIX if available
-    if _SAFE_GPU_AVAILABLE and SAFE_GPU is not None:
-        try:
-            SAFE_GPU.claim_gpus(logger=logger)
-        except Exception as e:  # pylint: disable=broad-except
+        if not torch.cuda.is_available():
             if logger:
-                logger.warning("safe_gpu.claim_gpus failed (%s); "
-                               "continuing with default CUDA device.", e)
-    else:
-        if logger:
-            logger.info("safe_gpu not available (or Windows). "
-                        "Using default CUDA device.")
+                logger.warning("CUDA not available. Falling back to CPU.")
+            return torch.device("cpu")
 
-    return torch.device("cuda")
+        if gpu_index is not None:
+            return torch.device(f"cuda:{gpu_index}")
+
+        if _SAFE_GPU_AVAILABLE and SAFE_GPU is not None:
+            try:
+                SAFE_GPU.claim_gpus(logger=logger)
+            except Exception as e:  # pylint: disable=broad-except
+                if logger:
+                    logger.warning("safe_gpu.claim_gpus failed: %s", e)
+        elif logger:
+            logger.info("safe_gpu not available. Using default CUDA device.")
+
+        return torch.device("cuda")
+
+
+class FileProcessor:
+    """Processes individual files."""
+
+    def __init__(self, config: ConfigManager):
+        self.config = config
+        self.page_parser = None
+        self._paths = {}
+
+    def initialize(self, args: argparse.Namespace) -> None:
+        """Initialize the processor."""
+        logger = logging.getLogger()
+        device = DeviceManager.get_device(args.device, args.gpu_id, logger)
+        logger.info("Using device: %s", device)
+
+        self.page_parser = PageParser(
+            self.config.config,
+            config_path=os.path.dirname(self.config.config_path),
+            device=device
+        )
+        self._load_paths()
+
+    def _load_paths(self) -> None:
+        """Load all paths from config."""
+        self._paths = {
+            'input_image': self.config.get_value('PARSE_FOLDER',
+                                                 'INPUT_IMAGE_PATH'),
+            'input_xml': self.config.get_value('PARSE_FOLDER',
+                                               'INPUT_XML_PATH'),
+            'input_logit': self.config.get_value('PARSE_FOLDER',
+                                                 'INPUT_LOGIT_PATH'),
+            'output_render': self.config.get_value('PARSE_FOLDER',
+                                                   'OUTPUT_RENDER_PATH'),
+            'output_line': self.config.get_value('PARSE_FOLDER',
+                                                 'OUTPUT_LINE_PATH'),
+            'output_xml': self.config.get_value('PARSE_FOLDER',
+                                                'OUTPUT_XML_PATH'),
+            'output_logit': self.config.get_value('PARSE_FOLDER',
+                                                  'OUTPUT_LOGIT_PATH'),
+            'output_alto': self.config.get_value('PARSE_FOLDER',
+                                                 'OUTPUT_ALTO_PATH'),
+        }
+
+    def _check_compatibility(self) -> None:
+        """Check parser compatibility with requested outputs."""
+        logger = logging.getLogger()
+
+        if not self.page_parser.provides_ctc_logits:
+            if (not self._paths['input_logit'] and
+                    self._paths['output_alto']):
+                logger.error(
+                    'Cannot create ALTO with current PageParser '
+                    '(transformer outputs are incompatible)'
+                )
+                sys.exit(2)
+
+            if self._paths['output_logit']:
+                logger.error(
+                    'Cannot store logits with current PageParser '
+                    '(transformer outputs are incompatible)'
+                )
+                sys.exit(2)
+
+    def _create_output_dirs(self) -> None:
+        """Create output directories if they don't exist."""
+        paths = [
+            self._paths['output_render'],
+            self._paths['output_line'],
+            self._paths['output_xml'],
+            self._paths['output_logit'],
+            self._paths['output_alto'],
+        ]
+
+        for path in paths:
+            if path and not os.path.exists(path):
+                os.makedirs(path)
+
+    def _handle_logit_warning(self) -> None:
+        """Handle logit path warnings."""
+        logger = logging.getLogger()
+        if (self._paths['input_logit'] is not None and
+                self._paths['input_xml'] is None):
+            self._paths['input_logit'] = None
+            logger.warning(
+                'Logit path specified without XML path. Logits will be ignored.'
+            )
 
 
 class LmdbWriter:
     """Writer for LMDB database storage."""
 
-    def __init__(self, path):
+    def __init__(self, path: str):
         import lmdb
         gb100 = 100_000_000_000
         self.env_out = lmdb.open(path, map_size=gb100)
 
-    def __call__(self, page_layout: PageLayout, file_id):
+    def __call__(self, page_layout: PageLayout, file_id: str) -> None:
         """Write page layout to LMDB."""
         all_lines = list(page_layout.lines_iterator())
-        all_lines = sorted(all_lines, key=lambda x: x.id)
-        records_to_write = {}
+        all_lines.sort(key=lambda x: x.id)
+        records = {}
 
         for line in all_lines:
             if line.transcription:
@@ -202,75 +278,129 @@ class LmdbWriter:
                     line.crop.astype(np.uint8),
                     [int(cv2.IMWRITE_JPEG_QUALITY), 95]
                 )[1].tobytes()
-                records_to_write[key] = img
+                records[key] = img
 
-        with self.env_out.begin(write=True) as txn_out:
-            cursor = txn_out.cursor()
-            for key, value in records_to_write.items():
+        with self.env_out.begin(write=True) as txn:
+            cursor = txn.cursor()
+            for key, value in records.items():
                 cursor.put(key.encode(), value)
 
 
-class Computator:
-    """Main computation class for processing pages."""
+class PageComputator:
+    """Computes and processes individual pages."""
 
-    def __init__(self, page_parser, input_image_path, input_xml_path,
-                 input_logit_path, output_render_path, output_logit_path,
-                 output_alto_path, output_xml_path, output_line_path):
+    def __init__(self, page_parser: PageParser, paths: Dict[str, Optional[str]]):
         self.page_parser = page_parser
-        self.input_image_path = input_image_path
-        self.input_xml_path = input_xml_path
-        self.input_logit_path = input_logit_path
-        self.output_render_path = output_render_path
-        self.output_logit_path = output_logit_path
-        self.output_alto_path = output_alto_path
-        self.output_xml_path = output_xml_path
-        self.output_line_path = output_line_path
+        self.paths = paths
 
-    def _process_outputs(self, page_layout, file_id, image):
-        """Process and save all outputs."""
+    def process(self, image_file_name: Optional[str], file_id: str,
+                index: int, total_count: int) -> List[str]:
+        """Process a single file."""
+        print(f"Processing {file_id}")
+        start_time = time.time()
+
+        try:
+            page_layout = self._load_page(image_file_name, file_id)
+            page_layout = self.page_parser.process_page(
+                self._load_image(image_file_name),
+                page_layout
+            )
+            self._save_outputs(page_layout, file_id)
+            annotations = self._extract_annotations(page_layout, file_id)
+
+        except KeyboardInterrupt:
+            traceback.print_exc()
+            print('Terminated by user.')
+            sys.exit()
+        except Exception as error:  # pylint: disable=broad-except
+            print(f'ERROR: Failed to process file {file_id}.')
+            print(error)
+            traceback.print_exc()
+            annotations = []
+
+        self._print_progress(index, total_count, file_id, start_time)
+        return annotations
+
+    def _load_image(self, image_file_name: Optional[str]) -> Optional[np.ndarray]:
+        """Load image from file."""
+        if (image_file_name is None or
+                self.paths['input_image'] is None):
+            return None
+
+        image_path = os.path.join(self.paths['input_image'], image_file_name)
+        image = cv2.imread(image_path, 1)
+        if image is None:
+            raise RuntimeError(f'Unable to read image "{image_path}"')
+        return image
+
+    def _load_page(self, image_file_name: Optional[str],
+                   file_id: str) -> PageLayout:
+        """Load or create page layout."""
+        if self.paths['input_xml']:
+            xml_path = os.path.join(self.paths['input_xml'], file_id + '.xml')
+            page_layout = PageLayout(file=xml_path)
+        else:
+            image = self._load_image(image_file_name)
+            page_size = image.shape[:2] if image is not None else (0, 0)
+            page_layout = PageLayout(id=file_id, page_size=page_size)
+
+        if self.paths['input_logit']:
+            logits_path = os.path.join(
+                self.paths['input_logit'], file_id + '.logits'
+            )
+            page_layout.load_logits(logits_path)
+
+        return page_layout
+
+    def _save_outputs(self, page_layout: PageLayout, file_id: str) -> None:
+        """Save all requested outputs."""
         # Save XML
-        if self.output_xml_path is not None:
-            xml_path = os.path.join(self.output_xml_path, file_id + '.xml')
+        if self.paths['output_xml']:
+            xml_path = os.path.join(self.paths['output_xml'], file_id + '.xml')
             page_layout.to_pagexml(xml_path)
 
-        # Save rendered image
-        if self.output_render_path is not None and image is not None:
-            page_layout.render_to_image(image)
-            render_path = os.path.join(
-                self.output_render_path, file_id + '.jpg'
-            )
-            cv2.imwrite(
-                render_path,
-                image,
-                [int(cv2.IMWRITE_JPEG_QUALITY), 70]
-            )
+        # Save render
+        if self.paths['output_render']:
+            image = self._load_image(None)  # Get current image
+            if image is not None:
+                page_layout.render_to_image(image)
+                render_path = os.path.join(
+                    self.paths['output_render'], file_id + '.jpg'
+                )
+                cv2.imwrite(
+                    render_path,
+                    image,
+                    [int(cv2.IMWRITE_JPEG_QUALITY), 70]
+                )
 
         # Save logits
-        if self.output_logit_path is not None:
+        if self.paths['output_logit']:
             logits_path = os.path.join(
-                self.output_logit_path, file_id + '.logits'
+                self.paths['output_logit'], file_id + '.logits'
             )
             page_layout.save_logits(logits_path)
 
         # Save ALTO
-        if self.output_alto_path is not None:
-            alto_path = os.path.join(self.output_alto_path, file_id + '.xml')
+        if self.paths['output_alto']:
+            alto_path = os.path.join(self.paths['output_alto'], file_id + '.xml')
             page_layout.to_altoxml(alto_path)
 
         # Save line images
-        if self.output_line_path is not None and page_layout is not None:
-            self._save_line_images(page_layout, file_id)
+        self._save_line_images(page_layout, file_id)
 
-    def _save_line_images(self, page_layout, file_id):
+    def _save_line_images(self, page_layout: PageLayout, file_id: str) -> None:
         """Save individual line images."""
-        if 'lmdb' in self.output_line_path:
-            lmdb_writer = LmdbWriter(self.output_line_path)
-            lmdb_writer(page_layout, file_id)
+        if self.paths['output_line'] is None:
+            return
+
+        if 'lmdb' in self.paths['output_line']:
+            writer = LmdbWriter(self.paths['output_line'])
+            writer(page_layout, file_id)
         else:
             for region in page_layout.regions:
                 for line in region.lines:
                     line_path = os.path.join(
-                        self.output_line_path,
+                        self.paths['output_line'],
                         f'{file_id}-{line.id}.jpg'
                     )
                     cv2.imwrite(
@@ -279,300 +409,282 @@ class Computator:
                         [int(cv2.IMWRITE_JPEG_QUALITY), 98]
                     )
 
-    def _extract_annotations(self, page_layout, file_id):
+    def _extract_annotations(self, page_layout: PageLayout,
+                             file_id: str) -> List[str]:
         """Extract transcription annotations."""
         all_lines = list(page_layout.lines_iterator())
-        all_lines = sorted(all_lines, key=lambda x: x.id)
+        all_lines.sort(key=lambda x: x.id)
         annotations = []
+
         for line in all_lines:
             if line.transcription:
                 key = f'{file_id}-{line.id}.jpg'
                 annotations.append(f"{key} {line.transcription}")
+
         return annotations
 
-    def __call__(self, image_file_name, file_id, index, ids_count):
-        """Process a single file."""
-        print(f"Processing {file_id}")
-        start_time = time.time()
-
-        try:
-            # Load image
-            if self.input_image_path is not None:
-                img_path = os.path.join(
-                    self.input_image_path, image_file_name
-                )
-                image = cv2.imread(img_path, 1)
-                if image is None:
-                    raise RuntimeError(f'Unable to read image "{img_path}"')
-            else:
-                image = None
-
-            # Load or create page layout
-            if self.input_xml_path:
-                xml_path = os.path.join(self.input_xml_path, file_id + '.xml')
-                page_layout = PageLayout(file=xml_path)
-            else:
-                page_size = (image.shape[0], image.shape[1])
-                page_layout = PageLayout(id=file_id, page_size=page_size)
-
-            # Load logits if available
-            if self.input_logit_path is not None:
-                logits_path = os.path.join(
-                    self.input_logit_path, file_id + '.logits'
-                )
-                page_layout.load_logits(logits_path)
-
-            # Process page
-            page_layout = self.page_parser.process_page(image, page_layout)
-
-            # Process outputs
-            self._process_outputs(page_layout, file_id, image)
-
-            # Extract annotations
-            annotations = self._extract_annotations(page_layout, file_id)
-
-        except KeyboardInterrupt:
-            traceback.print_exc()
-            print('Terminated by user.')
-            sys.exit()
-        except Exception as e:  # pylint: disable=broad-except
-            print(f'ERROR: Failed to process file {file_id}.')
-            print(e)
-            traceback.print_exc()
-            annotations = []
-
-        # Print progress
+    def _print_progress(self, index: int, total: int,
+                        file_id: str, start_time: float) -> None:
+        """Print processing progress."""
         elapsed = time.time() - start_time
         current = index + 1
-        percentage = current / ids_count * 100
-        print(f"DONE {current}/{ids_count} ({percentage:.2f} %) "
+        percentage = current / total * 100
+        print(f"DONE {current}/{total} ({percentage:.2f} %) "
               f"[id: {file_id}] Time:{elapsed:.2f}")
 
-        return annotations
 
+class FileListManager:
+    """Manages lists of files to process."""
 
-def _prepare_file_lists(input_image_path, input_xml_path, logger):
-    """Prepare lists of files to process."""
-    if input_image_path is not None:
-        logger.info('Reading images from %s.', input_image_path)
-        ignored_extensions = ['', '.xml', '.logits']
-        images_to_process = [
-            f for f in os.listdir(input_image_path)
+    @staticmethod
+    def prepare(input_image_path: Optional[str],
+                input_xml_path: Optional[str],
+                logger: logging.Logger) -> Tuple[List[str], List[Optional[str]]]:
+        """Prepare lists of files to process."""
+        if input_image_path is not None:
+            logger.info('Reading images from %s.', input_image_path)
+            return FileListManager._get_image_files(input_image_path)
+        if input_xml_path is not None:
+            logger.info('Reading page xml from %s', input_xml_path)
+            return FileListManager._get_xml_files(input_xml_path)
+
+        raise RuntimeError(
+            'Either INPUT_IMAGE_PATH or INPUT_XML_PATH must be specified.'
+        )
+
+    @staticmethod
+    def _get_image_files(path: str) -> Tuple[List[str], List[Optional[str]]]:
+        """Get image files from directory."""
+        ignored_extensions = {'', '.xml', '.logits'}
+        images = [
+            f for f in os.listdir(path)
             if os.path.splitext(f)[1].lower() not in ignored_extensions
         ]
-        images_to_process = sorted(images_to_process)
-        ids_to_process = [
-            os.path.splitext(os.path.basename(f))[0]
-            for f in images_to_process
-        ]
-    elif input_xml_path is not None:
-        logger.info('Reading page xml from %s', input_xml_path)
-        xml_to_process = [
-            f for f in os.listdir(input_xml_path)
+        images.sort()
+        ids = [os.path.splitext(os.path.basename(f))[0] for f in images]
+        return ids, images
+
+    @staticmethod
+    def _get_xml_files(path: str) -> Tuple[List[str], List[Optional[str]]]:
+        """Get XML files from directory."""
+        xml_files = [
+            f for f in os.listdir(path)
             if os.path.splitext(f)[1] == '.xml'
         ]
-        images_to_process = [None] * len(xml_to_process)
-        ids_to_process = [
-            os.path.splitext(os.path.basename(f))[0]
-            for f in xml_to_process
-        ]
-    else:
-        raise RuntimeError(
-            'Either INPUT_IMAGE_PATH or INPUT_XML_PATH has to be specified.'
-        )
+        ids = [os.path.splitext(os.path.basename(f))[0] for f in xml_files]
+        return ids, [None] * len(ids)
 
-    return ids_to_process, images_to_process
+    @staticmethod
+    def filter_missing_xml(input_xml_path: str, ids: List[str],
+                           images: List[Optional[str]]
+                           ) -> Tuple[List[str], List[Optional[str]]]:
+        """Filter files where XML is missing."""
+        filtered_ids = []
+        filtered_images = []
 
+        for file_id, image_file in zip(ids, images):
+            file_path = os.path.join(input_xml_path, file_id + '.xml')
+            if os.path.exists(file_path):
+                filtered_ids.append(file_id)
+                filtered_images.append(image_file)
 
-def _filter_missing_xml(input_xml_path, ids_to_process, images_to_process):
-    """Filter files where XML is missing."""
-    filtered_ids = []
-    filtered_images = []
-
-    for file_id, image_file_name in zip(ids_to_process, images_to_process):
-        file_path = os.path.join(input_xml_path, file_id + '.xml')
-        if os.path.exists(file_path):
-            filtered_ids.append(file_id)
-            filtered_images.append(image_file_name)
-
-    return filtered_ids, filtered_images
+        return filtered_ids, filtered_images
 
 
-def main():
-    """Main entry point."""
-    args = parse_arguments()
-    config_path = args.config
+class ProcessedFilesManager:
+    """Manages already processed files."""
 
-    if not os.path.isfile(config_path):
-        print(f'ERROR: Config file does not exist: "{config_path}".')
-        sys.exit(-1)
+    @staticmethod
+    def load(directories: List[Optional[str]]) -> Set[str]:
+        """Load set of already processed files."""
+        if not directories:
+            return set()
 
-    config = configparser.ConfigParser()
-    config.read(config_path)
+        processed = None
+        for directory in directories:
+            if directory is None:
+                continue
 
-    if 'PARSE_FOLDER' not in config:
-        config.add_section('PARSE_FOLDER')
-
-    # Update config with command line arguments
-    arg_mapping = {
-        'INPUT_IMAGE_PATH': args.input_image_path,
-        'INPUT_XML_PATH': args.input_xml_path,
-        'INPUT_LOGIT_PATH': args.input_logit_path,
-        'OUTPUT_XML_PATH': args.output_xml_path,
-        'OUTPUT_RENDER_PATH': args.output_render_path,
-        'OUTPUT_LINE_PATH': args.output_line_path,
-        'OUTPUT_LOGIT_PATH': args.output_logit_path,
-        'OUTPUT_ALTO_PATH': args.output_alto_path,
-    }
-
-    for key, value in arg_mapping.items():
-        if value is not None:
-            config['PARSE_FOLDER'][key] = value
-
-    setup_logging(config['PARSE_FOLDER'])
-    logger = logging.getLogger()
-
-    device = get_device(args.device, args.gpu_id, logger)
-    logger.info("Using device: %s", device)
-
-    page_parser = PageParser(
-        config,
-        config_path=os.path.dirname(config_path),
-        device=device
-    )
-
-    # Get paths from config
-    input_image_path = get_value_or_none(
-        config, 'PARSE_FOLDER', 'INPUT_IMAGE_PATH'
-    )
-    input_xml_path = get_value_or_none(
-        config, 'PARSE_FOLDER', 'INPUT_XML_PATH'
-    )
-    input_logit_path = get_value_or_none(
-        config, 'PARSE_FOLDER', 'INPUT_LOGIT_PATH'
-    )
-    output_render_path = get_value_or_none(
-        config, 'PARSE_FOLDER', 'OUTPUT_RENDER_PATH'
-    )
-    output_line_path = get_value_or_none(
-        config, 'PARSE_FOLDER', 'OUTPUT_LINE_PATH'
-    )
-    output_xml_path = get_value_or_none(
-        config, 'PARSE_FOLDER', 'OUTPUT_XML_PATH'
-    )
-    output_logit_path = get_value_or_none(
-        config, 'PARSE_FOLDER', 'OUTPUT_LOGIT_PATH'
-    )
-    output_alto_path = get_value_or_none(
-        config, 'PARSE_FOLDER', 'OUTPUT_ALTO_PATH'
-    )
-
-    # Check compatibility
-    if not page_parser.provides_ctc_logits:
-        if not input_logit_path and output_alto_path:
-            logger.error(
-                'Cannot create ALTO with current PageParser '
-                '(transformer outputs are incompatible)'
-            )
-            sys.exit(2)
-        if output_logit_path:
-            logger.error(
-                'Cannot store logits with current PageParser '
-                '(transformer outputs are incompatible)'
-            )
-            sys.exit(2)
-
-    # Create output directories
-    output_dirs = [
-        output_render_path, output_line_path, output_xml_path,
-        output_logit_path, output_alto_path
-    ]
-    for directory in output_dirs:
-        if directory is not None:
-            create_dir_if_not_exists(directory)
-
-    # Handle logit path warning
-    if input_logit_path is not None and input_xml_path is None:
-        input_logit_path = None
-        logger.warning(
-            'Logit path specified and Page XML path not specified. '
-            'Logits will be ignored.'
-        )
-
-    # Prepare file lists
-    ids_to_process, images_to_process = _prepare_file_lists(
-        input_image_path, input_xml_path, logger
-    )
-
-    # Filter already processed files
-    if args.skip_processed:
-        already_processed = load_already_processed_files(
-            [output_xml_path, output_logit_path, output_render_path]
-        )
-        if already_processed:
-            logger.info("Already processed %s file(s).", len(already_processed))
-            filtered_pairs = [
-                (id_, img) for id_, img in zip(ids_to_process, images_to_process)
-                if id_ not in already_processed
-            ]
-            if filtered_pairs:
-                ids_to_process, images_to_process = zip(*filtered_pairs)
+            files = ProcessedFilesManager._load_from_dir(directory)
+            if processed is None:
+                processed = files
             else:
-                ids_to_process, images_to_process = [], []
+                processed = processed.intersection(files)
 
-    # Filter missing XML
-    if input_xml_path and args.skipp_missing_xml:
-        ids_to_process, images_to_process = _filter_missing_xml(
-            input_xml_path, ids_to_process, images_to_process
+        return processed or set()
+
+    @staticmethod
+    def _load_from_dir(directory: str) -> Set[str]:
+        """Load processed files from a single directory."""
+        pattern = re.compile(r"(.+?)(\.logits|\.xml|\.jpg)")
+        processed = set()
+
+        for file in os.listdir(directory):
+            match = pattern.match(file)
+            if match:
+                processed.add(match.group(1))
+
+        return processed
+
+
+class MainProcessor:
+    """Main processor orchestrating the entire workflow."""
+
+    def __init__(self):
+        self.args = None
+        self.config = None
+        self.file_processor = None
+        self.ids_to_process = []
+        self.images_to_process = []
+
+    def run(self) -> None:
+        """Run the main processing pipeline."""
+        self.args = ArgumentParser.parse()
+        self.config = ConfigManager(self.args.config)
+        self.config.update_from_args(self.args)
+
+        LoggingConfig.setup(self.config.config['PARSE_FOLDER'])
+        logger = logging.getLogger()
+
+        self.file_processor = FileProcessor(self.config)
+        self.file_processor.initialize(self.args)
+
+        self._prepare_processing()
+        self._filter_files()
+        self._process_files()
+
+        self._print_summary(logger)
+
+    def _prepare_processing(self) -> None:
+        """Prepare for processing."""
+        self.file_processor._check_compatibility()
+        self.file_processor._create_output_dirs()
+        self.file_processor._handle_logit_warning()
+
+        paths = self.file_processor._paths
+        logger = logging.getLogger()
+        self.ids_to_process, self.images_to_process = (
+            FileListManager.prepare(
+                paths['input_image'],
+                paths['input_xml'],
+                logger
+            )
         )
 
-    # Create computator and process
-    computator = Computator(
-        page_parser,
-        input_image_path,
-        input_xml_path,
-        input_logit_path,
-        output_render_path,
-        output_logit_path,
-        output_alto_path,
-        output_xml_path,
-        output_line_path
-    )
+    def _filter_files(self) -> None:
+        """Filter files based on various criteria."""
+        paths = self.file_processor._paths
+        logger = logging.getLogger()
 
-    start_time = time.time()
-    results = []
+        # Filter already processed
+        if self.args.skip_processed:
+            output_dirs = [
+                paths['output_xml'],
+                paths['output_logit'],
+                paths['output_render'],
+            ]
+            processed = ProcessedFilesManager.load(output_dirs)
+            if processed:
+                logger.info("Already processed %s file(s).", len(processed))
+                self._apply_filter(processed)
 
-    if args.process_count > 1:
-        with Pool(processes=args.process_count) as pool:
-            tasks = []
-            for idx, (file_id, img_file) in enumerate(
-                zip(ids_to_process, images_to_process)
-            ):
-                tasks.append((img_file, file_id, idx, len(ids_to_process)))
-            results = pool.starmap(computator, tasks)
-    else:
-        for idx, (file_id, img_file) in enumerate(
-            zip(ids_to_process, images_to_process)
-        ):
-            results.append(
-                computator(img_file, file_id, idx, len(ids_to_process))
+        # Filter missing XML
+        if paths['input_xml'] and self.args.skipp_missing_xml:
+            self.ids_to_process, self.images_to_process = (
+                FileListManager.filter_missing_xml(
+                    paths['input_xml'],
+                    self.ids_to_process,
+                    self.images_to_process
+                )
             )
 
-    # Save transcriptions
-    if args.output_transcriptions_file_path is not None:
-        with open(args.output_transcriptions_file_path, 'w',
-                  encoding='utf-8') as f:
-            for page_lines in results:
-                if page_lines:
-                    f.write('\n'.join(page_lines) + '\n')
+    def _apply_filter(self, exclude_set: Set[str]) -> None:
+        """Apply filter to exclude files."""
+        filtered = [
+            (id_, img) for id_, img in zip(self.ids_to_process,
+                                           self.images_to_process)
+            if id_ not in exclude_set
+        ]
+        if filtered:
+            self.ids_to_process, self.images_to_process = zip(*filtered)
+        else:
+            self.ids_to_process, self.images_to_process = [], []
 
-    # Print summary
-    if page_parser.decoder:
-        logger.info(page_parser.decoder.decoding_summary())
+    def _process_files(self) -> None:
+        """Process all files."""
+        computator = PageComputator(
+            self.file_processor.page_parser,
+            self.file_processor._paths
+        )
 
-    if ids_to_process:
-        avg_time = (time.time() - start_time) / len(ids_to_process)
-        logger.info('AVERAGE PROCESSING TIME %s', avg_time)
+        start_time = time.time()
+        results = []
+
+        if self.args.process_count > 1:
+            results = self._process_parallel(computator)
+        else:
+            results = self._process_sequential(computator)
+
+        self._save_transcriptions(results)
+        self._print_processing_time(start_time)
+
+    def _process_parallel(self, computator: PageComputator) -> List[List[str]]:
+        """Process files in parallel."""
+        with Pool(processes=self.args.process_count) as pool:
+            tasks = [
+                (img, file_id, idx, len(self.ids_to_process))
+                for idx, (file_id, img) in enumerate(
+                    zip(self.ids_to_process, self.images_to_process)
+                )
+            ]
+            return pool.starmap(computator.process, tasks)
+
+    def _process_sequential(self, computator: PageComputator) -> List[List[str]]:
+        """Process files sequentially."""
+        results = []
+        for idx, (file_id, img) in enumerate(
+            zip(self.ids_to_process, self.images_to_process)
+        ):
+            result = computator.process(
+                img, file_id, idx, len(self.ids_to_process)
+            )
+            results.append(result)
+        return results
+
+    def _save_transcriptions(self, results: List[List[str]]) -> None:
+        """Save transcription results to file."""
+        if self.args.output_transcriptions_file_path:
+            with open(self.args.output_transcriptions_file_path, 'w',
+                      encoding='utf-8') as file:
+                for page_lines in results:
+                    if page_lines:
+                        file.write('\n'.join(page_lines) + '\n')
+
+    def _print_processing_time(self, start_time: float) -> None:
+        """Print average processing time."""
+        if self.ids_to_process:
+            avg_time = (time.time() - start_time) / len(self.ids_to_process)
+            logger = logging.getLogger()
+            logger.info('AVERAGE PROCESSING TIME %s', avg_time)
+
+    def _print_summary(self, logger: logging.Logger) -> None:
+        """Print final summary."""
+        if self.file_processor.page_parser.decoder:
+            logger.info(self.file_processor.page_parser.decoder.decoding_summary())
+
+
+def main() -> None:
+    """Main entry point."""
+    try:
+        processor = MainProcessor()
+        processor.run()
+    except FileNotFoundError as error:
+        print(f'ERROR: {error}')
+        sys.exit(-1)
+    except Exception as error:  # pylint: disable=broad-except
+        print(f'ERROR: {error}')
+        traceback.print_exc()
+        sys.exit(1)
 
 
 if __name__ == "__main__":
