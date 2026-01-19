@@ -2,11 +2,13 @@ import argparse
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
+
 def detect_alto_ns(root: ET.Element) -> str:
     # Root tag looks like "{namespace}alto"
     if root.tag.startswith("{") and "}" in root.tag:
         return root.tag.split("}")[0][1:]
     return ""  # no namespace (unlikely for ALTO)
+
 
 def extract_text(alto_path: Path) -> str:
     tree = ET.parse(alto_path)
@@ -50,6 +52,7 @@ def extract_text(alto_path: Path) -> str:
 
     return "\n".join(lines_out)
 
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("alto_xml", help="Path to ALTO XML")
@@ -62,6 +65,7 @@ def main():
     text = extract_text(in_path)
     out_path.write_text(text, encoding="utf-8")
     print(f"OK: wrote {out_path} ({len(text)} chars)")
+
 
 if __name__ == "__main__":
     main()
