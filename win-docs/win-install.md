@@ -148,8 +148,8 @@ For each image:
 - `*.xml` – PageXML (default)
 
 Further processing is described in:
-- [alto-versions.md]
-- [workflow-examples.md]
+- [alto-versions.md](alto-versions.md)
+- [workflow-examples.md](workflow-examples.md)
 
 ---
 
@@ -163,6 +163,7 @@ Further processing is described in:
 
 Next document:
 [**gpu-cuda-pytorch.md**](gpu-cuda-pytorch.md)
+
 
 
 
