@@ -1,0 +1,33 @@
+name: "CodeQL config (pero-ocr-win)"
+
+# Add extra query packs if you want:
+# queries:
+#   - uses: security-and-quality
+
+paths-ignore:
+  - docs/**
+  - book/**
+  - **/*.md
+  - **/*.txt
+  - **/*.xml
+  - **/*.jpg
+  - **/*.jpeg
+  - **/*.png
+  - **/*.tif
+  - **/*.tiff
+  - **/*.jp2
+  - **/*.j2k
+  - **/*.pdf
+  - models/**
+  - out/**
+  - out_*/**
+  - .venv/**
+  - **/__pycache__/**
+  - **/*.pyc
+  - dist/**
+  - build/**
+  - .github/workflows/**  # optional; uncomment if you want to exclude workflows from python scan
+
+# Optional: focus CodeQL Python on your Windows scripts only (if you prefer)
+# paths:
+#   - win-scripts/**
