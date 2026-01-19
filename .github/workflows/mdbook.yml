@@ -26,44 +26,40 @@ jobs:
         run: |
           cd win-docs
           if [ ! -f SUMMARY.md ]; then
-            cat > SUMMARY.md << 'EOF'
-# Summary
-
-[PERO OCR for Windows – Documentation Index](INDEX.md)
-
-## Installation & Environment
-- [Windows installation](win-install.md)
-- [GPU, CUDA and PyTorch setup](gpu-cuda-pytorch.md)
-
-## OCR Outputs & Formats
-- [ALTO versions and conversion](alto-versions.md)
-
-## Practical Usage
-- [Workflow examples (OCR → ALTO → TXT)](workflow-examples.md)
-
-## Project Context
-- [About this fork and upstream project](README-upstream.md)
-EOF
+            echo '# Summary' > SUMMARY.md
+            echo '' >> SUMMARY.md
+            echo '[PERO OCR for Windows – Documentation Index](INDEX.md)' >> SUMMARY.md
+            echo '' >> SUMMARY.md
+            echo '## Installation & Environment' >> SUMMARY.md
+            echo '- [Windows installation](win-install.md)' >> SUMMARY.md
+            echo '- [GPU, CUDA and PyTorch setup](gpu-cuda-pytorch.md)' >> SUMMARY.md
+            echo '' >> SUMMARY.md
+            echo '## OCR Outputs & Formats' >> SUMMARY.md
+            echo '- [ALTO versions and conversion](alto-versions.md)' >> SUMMARY.md
+            echo '' >> SUMMARY.md
+            echo '## Practical Usage' >> SUMMARY.md
+            echo '- [Workflow examples (OCR → ALTO → TXT)](workflow-examples.md)' >> SUMMARY.md
+            echo '' >> SUMMARY.md
+            echo '## Project Context' >> SUMMARY.md
+            echo '- [About this fork and upstream project](README-upstream.md)' >> SUMMARY.md
           fi
       
       - name: Create mdbook.toml if missing
         run: |
           if [ ! -f mdbook.toml ]; then
-            cat > mdbook.toml << 'EOF'
-[book]
-title = "Pero OCR Windows - Documentation"
-description = "Windows-focused fork of PERO OCR project"
-authors = ["bezverec"]
-src = "win-docs"
-
-[build]
-build-dir = "_site"
-create-missing = true
-
-[output.html]
-default-theme = "dark"
-preferred-dark-theme = "dark"
-EOF
+            echo '[book]' > mdbook.toml
+            echo 'title = "Pero OCR Windows - Documentation"' >> mdbook.toml
+            echo 'description = "Windows-focused fork of PERO OCR project"' >> mdbook.toml
+            echo 'authors = ["bezverec"]' >> mdbook.toml
+            echo 'src = "win-docs"' >> mdbook.toml
+            echo '' >> mdbook.toml
+            echo '[build]' >> mdbook.toml
+            echo 'build-dir = "_site"' >> mdbook.toml
+            echo 'create-missing = true' >> mdbook.toml
+            echo '' >> mdbook.toml
+            echo '[output.html]' >> mdbook.toml
+            echo 'default-theme = "dark"' >> mdbook.toml
+            echo 'preferred-dark-theme = "dark"' >> mdbook.toml
           fi
       
       - name: Install mdBook
@@ -85,58 +81,56 @@ EOF
           # Vytvořit složku pro CSS
           mkdir -p _site/css
           
-          # Vytvořit custom CSS soubor
-          cat > _site/css/custom.css << 'EOF'
-          /* Custom styles for Pero OCR documentation */
-          :root {
-            --md-primary-fg-color: #238636;
-            --md-primary-fg-color--light: #2ea043;
-            --md-primary-fg-color--dark: #1f6f3b;
-          }
-          
-          .md-header {
-            background: linear-gradient(90deg, #161b22, #0d1117);
-          }
-          
-          .md-typeset code {
-            background-color: rgba(0, 0, 0, 0.2);
-            border-radius: 4px;
-            padding: 0.2em 0.4em;
-          }
-          
-          .md-typeset pre > code {
-            background-color: #161b22;
-            border: 1px solid #30363d;
-          }
-          
-          /* PowerShell syntax highlighting */
-          .language-powershell .c, .language-powershell .c1 {
-            color: #6e7681;
-            font-style: italic;
-          }
-          
-          .language-powershell .k, .language-powershell .kd {
-            color: #ff7b72;
-          }
-          
-          .language-powershell .s, .language-powershell .s1 {
-            color: #a5d6ff;
-          }
-          
-          /* Table improvements */
-          .md-typeset table {
-            border: 1px solid #30363d;
-            box-shadow: none;
-          }
-          
-          .md-typeset th {
-            background-color: #161b22;
-          }
-          
-          .md-typeset td, .md-typeset th {
-            border: 1px solid #30363d;
-          }
-          EOF
+          # Vytvořit custom CSS soubor bez HEREDOC
+          echo '/* Custom styles for Pero OCR documentation */' > _site/css/custom.css
+          echo ':root {' >> _site/css/custom.css
+          echo '  --md-primary-fg-color: #238636;' >> _site/css/custom.css
+          echo '  --md-primary-fg-color--light: #2ea043;' >> _site/css/custom.css
+          echo '  --md-primary-fg-color--dark: #1f6f3b;' >> _site/css/custom.css
+          echo '}' >> _site/css/custom.css
+          echo '' >> _site/css/custom.css
+          echo '.md-header {' >> _site/css/custom.css
+          echo '  background: linear-gradient(90deg, #161b22, #0d1117);' >> _site/css/custom.css
+          echo '}' >> _site/css/custom.css
+          echo '' >> _site/css/custom.css
+          echo '.md-typeset code {' >> _site/css/custom.css
+          echo '  background-color: rgba(0, 0, 0, 0.2);' >> _site/css/custom.css
+          echo '  border-radius: 4px;' >> _site/css/custom.css
+          echo '  padding: 0.2em 0.4em;' >> _site/css/custom.css
+          echo '}' >> _site/css/custom.css
+          echo '' >> _site/css/custom.css
+          echo '.md-typeset pre > code {' >> _site/css/custom.css
+          echo '  background-color: #161b22;' >> _site/css/custom.css
+          echo '  border: 1px solid #30363d;' >> _site/css/custom.css
+          echo '}' >> _site/css/custom.css
+          echo '' >> _site/css/custom.css
+          echo '/* PowerShell syntax highlighting */' >> _site/css/custom.css
+          echo '.language-powershell .c, .language-powershell .c1 {' >> _site/css/custom.css
+          echo '  color: #6e7681;' >> _site/css/custom.css
+          echo '  font-style: italic;' >> _site/css/custom.css
+          echo '}' >> _site/css/custom.css
+          echo '' >> _site/css/custom.css
+          echo '.language-powershell .k, .language-powershell .kd {' >> _site/css/custom.css
+          echo '  color: #ff7b72;' >> _site/css/custom.css
+          echo '}' >> _site/css/custom.css
+          echo '' >> _site/css/custom.css
+          echo '.language-powershell .s, .language-powershell .s1 {' >> _site/css/custom.css
+          echo '  color: #a5d6ff;' >> _site/css/custom.css
+          echo '}' >> _site/css/custom.css
+          echo '' >> _site/css/custom.css
+          echo '/* Table improvements */' >> _site/css/custom.css
+          echo '.md-typeset table {' >> _site/css/custom.css
+          echo '  border: 1px solid #30363d;' >> _site/css/custom.css
+          echo '  box-shadow: none;' >> _site/css/custom.css
+          echo '}' >> _site/css/custom.css
+          echo '' >> _site/css/custom.css
+          echo '.md-typeset th {' >> _site/css/custom.css
+          echo '  background-color: #161b22;' >> _site/css/custom.css
+          echo '}' >> _site/css/custom.css
+          echo '' >> _site/css/custom.css
+          echo '.md-typeset td, .md-typeset th {' >> _site/css/custom.css
+          echo '  border: 1px solid #30363d;' >> _site/css/custom.css
+          echo '}' >> _site/css/custom.css
           
           # Přidat CSS do všech HTML souborů
           find _site -name "*.html" -exec sed -i 's|</head>|  <link rel="stylesheet" href="css/custom.css">\n</head>|' {} \;
