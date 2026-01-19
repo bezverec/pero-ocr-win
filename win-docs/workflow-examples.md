@@ -127,17 +127,35 @@ python win-scripts\win-pagexml_to_txt.py `
 ### Convert all PERO ALTO files to ALTO v4.4
 
 ```powershell
-for %f in (C:\temp\pero\out-alto\*.xml) do (
-  python win-scripts\win-alto_convert.py "%f" "C:\temp\pero\out-alto-v4_4\%~nxf" --to v4.4
-)
+$inDir  = "C:\temp\pero\out-alto"
+$outDir = "C:\temp\pero\out-alto-v4_4"
+
+New-Item -ItemType Directory -Force -Path $outDir | Out-Null
+
+Get-ChildItem $inDir -Filter *.xml | ForEach-Object {
+    $outFile = Join-Path $outDir $_.Name
+    python win-scripts\win-alto_convert.py `
+        "$($_.FullName)" `
+        "$outFile" `
+        --to v4.4
+}
 ```
 
 ### Convert all ALTO v4.4 files to TXT
 
 ```powershell
-for %f in (C:\temp\pero\out-alto-v4_4\*.xml) do (
-  python win-scripts\win-alto_to_txt.py "%f" "C:\temp\pero\out-txt\%~nf.txt" --paragraphs
-)
+$inDir  = "C:\temp\pero\out-alto-v4_4"
+$outDir = "C:\temp\pero\out-txt"
+
+New-Item -ItemType Directory -Force -Path $outDir | Out-Null
+
+Get-ChildItem $inDir -Filter *.xml | ForEach-Object {
+    $outFile = Join-Path $outDir ($_.BaseName + ".txt")
+    python win-scripts\win-alto_to_txt.py `
+        "$($_.FullName)" `
+        "$outFile" `
+        --paragraphs
+}
 ```
 
 ---
@@ -161,5 +179,6 @@ for %f in (C:\temp\pero\out-alto-v4_4\*.xml) do (
 
 Next document:
 [**README-upstream.md**](README-upstream.md)
+
 
 
