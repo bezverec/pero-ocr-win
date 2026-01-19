@@ -22,37 +22,34 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       
-      - name: Setup mdBook structure in win-docs
+      - name: Setup mdBook structure
         run: |
-          # Vytvořit správnou strukturu v win-docs
-          cd win-docs
+          # Vytvořit správnou strukturu pro mdBook
+          mkdir -p win-docs/src
           
-          # Vytvořit src adresář a přesunout .md soubory
-          mkdir -p src
-          mv *.md src/ 2>/dev/null || true
+          # Přesunout všechny .md soubory do src
+          cp win-docs/*.md win-docs/src/ 2>/dev/null || true
           
           # Vytvořit SUMMARY.md v src
-          cd src
-          if [ ! -f SUMMARY.md ]; then
-            echo '# Summary' > SUMMARY.md
-            echo '' >> SUMMARY.md
-            echo '[PERO OCR for Windows – Documentation Index](INDEX.md)' >> SUMMARY.md
-            echo '' >> SUMMARY.md
-            echo '## Installation & Environment' >> SUMMARY.md
-            echo '- [Windows installation](win-install.md)' >> SUMMARY.md
-            echo '- [GPU, CUDA and PyTorch setup](gpu-cuda-pytorch.md)' >> SUMMARY.md
-            echo '' >> SUMMARY.md
-            echo '## OCR Outputs & Formats' >> SUMMARY.md
-            echo '- [ALTO versions and conversion](alto-versions.md)' >> SUMMARY.md
-            echo '' >> SUMMARY.md
-            echo '## Practical Usage' >> SUMMARY.md
-            echo '- [Workflow examples (OCR → ALTO → TXT)](workflow-examples.md)' >> SUMMARY.md
-            echo '' >> SUMMARY.md
-            echo '## Project Context' >> SUMMARY.md
-            echo '- [About this fork and upstream project](README-upstream.md)' >> SUMMARY.md
-          fi
+          cd win-docs/src
+          echo '# Summary' > SUMMARY.md
+          echo '' >> SUMMARY.md
+          echo '[PERO OCR for Windows – Documentation Index](INDEX.md)' >> SUMMARY.md
+          echo '' >> SUMMARY.md
+          echo '## Installation & Environment' >> SUMMARY.md
+          echo '- [Windows installation](win-install.md)' >> SUMMARY.md
+          echo '- [GPU, CUDA and PyTorch setup](gpu-cuda-pytorch.md)' >> SUMMARY.md
+          echo '' >> SUMMARY.md
+          echo '## OCR Outputs & Formats' >> SUMMARY.md
+          echo '- [ALTO versions and conversion](alto-versions.md)' >> SUMMARY.md
+          echo '' >> SUMMARY.md
+          echo '## Practical Usage' >> SUMMARY.md
+          echo '- [Workflow examples (OCR → ALTO → TXT)](workflow-examples.md)' >> SUMMARY.md
+          echo '' >> SUMMARY.md
+          echo '## Project Context' >> SUMMARY.md
+          echo '- [About this fork and upstream project](README-upstream.md)' >> SUMMARY.md
           
-          # Vrátit se do win-docs a vytvořit mdbook.toml
+          # Vytvořit mdbook.toml v win-docs
           cd ..
           echo '[book]' > mdbook.toml
           echo 'title = "Pero OCR Windows - Documentation"' >> mdbook.toml
@@ -61,7 +58,7 @@ jobs:
           echo 'src = "src"' >> mdbook.toml
           echo '' >> mdbook.toml
           echo '[build]' >> mdbook.toml
-          echo 'build-dir = "../../_site"' >> mdbook.toml
+          echo 'build-dir = "../_site"' >> mdbook.toml
           echo 'create-missing = true' >> mdbook.toml
           echo '' >> mdbook.toml
           echo '[output.html]' >> mdbook.toml
@@ -77,128 +74,9 @@ jobs:
       - name: Build with mdBook
         run: |
           export PATH="$HOME/.cargo/bin:$PATH"
-          # Spustit mdbook z win-docs adresáře
           cd win-docs
           mdbook build
-          
-          # Přidat .nojekyll soubor pro GitHub Pages
           touch ../_site/.nojekyll
-      
-      - name: Add custom CSS
-        run: |
-          # Vytvořit složku pro CSS
-          mkdir -p _site/css
-          
-          # Vytvořit custom CSS soubor
-          echo '/* Custom styles for Pero OCR documentation */' > _site/css/custom.css
-          echo ':root {' >> _site/css/custom.css
-          echo '  --md-primary-fg-color: #238636;' >> _site/css/custom.css
-          echo '  --md-primary-fg-color--light: #2ea043;' >> _site/css/custom.css
-          echo '  --md-primary-fg-color--dark: #1f6f3b;' >> _site/css/custom.css
-          echo '}' >> _site/css/custom.css
-          echo '' >> _site/css/custom.css
-          echo '.md-header {' >> _site/css/custom.css
-          echo '  background: linear-gradient(90deg, #161b22, #0d1117);' >> _site/css/custom.css
-          echo '}' >> _site/css/custom.css
-          echo '' >> _site/css/custom.css
-          echo '.md-typeset code {' >> _site/css/custom.css
-          echo '  background-color: rgba(0, 0, 0, 0.2);' >> _site/css/custom.css
-          echo '  border-radius: 4px;' >> _site/css/custom.css
-          echo '  padding: 0.2em 0.4em;' >> _site/css/custom.css
-          echo '}' >> _site/css/custom.css
-          echo '' >> _site/css/custom.css
-          echo '.md-typeset pre > code {' >> _site/css/custom.css
-          echo '  background-color: #161b22;' >> _site/css/custom.css
-          echo '  border: 1px solid #30363d;' >> _site/css/custom.css
-          echo '}' >> _site/css/custom.css
-          echo '' >> _site/css/custom.css
-          echo '/* PowerShell syntax highlighting */' >> _site/css/custom.css
-          echo '.language-powershell .c, .language-powershell .c1 {' >> _site/css/custom.css
-          echo '  color: #6e7681;' >> _site/css/custom.css
-          echo '  font-style: italic;' >> _site/css/custom.css
-          echo '}' >> _site/css/custom.css
-          echo '' >> _site/css/custom.css
-          echo '.language-powershell .k, .language-powershell .kd {' >> _site/css/custom.css
-          echo '  color: #ff7b72;' >> _site/css/custom.css
-          echo '}' >> _site/css/custom.css
-          echo '' >> _site/css/custom.css
-          echo '.language-powershell .s, .language-powershell .s1 {' >> _site/css/custom.css
-          echo '  color: #a5d6ff;' >> _site/css/custom.css
-          echo '}' >> _site/css/custom.css
-          echo '' >> _site/css/custom.css
-          echo '/* Table improvements */' >> _site/css/custom.css
-          echo '.md-typeset table {' >> _site/css/custom.css
-          echo '  border: 1px solid #30363d;' >> _site/css/custom.css
-          echo '  box-shadow: none;' >> mdbook.toml
-          echo '}' >> mdbook.toml
-          echo '' >> mdbook.toml
-          echo '.md-typeset th {' >> mdbook.toml
-          echo '  background-color: #161b22;' >> mdbook.toml
-          echo '}' >> mdbook.toml
-          echo '' >> mdbook.toml
-          echo '.md-typeset td, .md-typeset th {' >> mdbook.toml
-          echo '  border: 1px solid #30363d;' >> mdbook.toml
-          echo '}' >> mdbook.toml
-          
-          # Přidat CSS do všech HTML souborů
-          find _site -name "*.html" -exec sed -i 's|</head>|  <link rel="stylesheet" href="css/custom.css">\n</head>|' {} \;
-      
-      - name: Setup Pages
-        id: pages
-        uses: actions/configure-pages@v5
-      
-      - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: ./_site
-
-  deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    runs-on: ubuntu-latest
-    needs: build
-    steps:
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4          echo '  padding: 0.2em 0.4em;' >> _site/css/custom.css
-          echo '}' >> _site/css/custom.css
-          echo '' >> _site/css/custom.css
-          echo '.md-typeset pre > code {' >> _site/css/custom.css
-          echo '  background-color: #161b22;' >> _site/css/custom.css
-          echo '  border: 1px solid #30363d;' >> _site/css/custom.css
-          echo '}' >> _site/css/custom.css
-          echo '' >> _site/css/custom.css
-          echo '/* PowerShell syntax highlighting */' >> _site/css/custom.css
-          echo '.language-powershell .c, .language-powershell .c1 {' >> _site/css/custom.css
-          echo '  color: #6e7681;' >> _site/css/custom.css
-          echo '  font-style: italic;' >> _site/css/custom.css
-          echo '}' >> _site/css/custom.css
-          echo '' >> _site/css/custom.css
-          echo '.language-powershell .k, .language-powershell .kd {' >> _site/css/custom.css
-          echo '  color: #ff7b72;' >> _site/css/custom.css
-          echo '}' >> _site/css/custom.css
-          echo '' >> _site/css/custom.css
-          echo '.language-powershell .s, .language-powershell .s1 {' >> _site/css/custom.css
-          echo '  color: #a5d6ff;' >> _site/css/custom.css
-          echo '}' >> _site/css/custom.css
-          echo '' >> _site/css/custom.css
-          echo '/* Table improvements */' >> _site/css/custom.css
-          echo '.md-typeset table {' >> _site/css/custom.css
-          echo '  border: 1px solid #30363d;' >> _site/css/custom.css
-          echo '  box-shadow: none;' >> _site/css/custom.css
-          echo '}' >> _site/css/custom.css
-          echo '' >> _site/css/custom.css
-          echo '.md-typeset th {' >> _site/css/custom.css
-          echo '  background-color: #161b22;' >> _site/css/custom.css
-          echo '}' >> _site/css/custom.css
-          echo '' >> _site/css/custom.css
-          echo '.md-typeset td, .md-typeset th {' >> _site/css/custom.css
-          echo '  border: 1px solid #30363d;' >> _site/css/custom.css
-          echo '}' >> _site/css/custom.css
-          
-          # Přidat CSS do všech HTML souborů
-          find _site -name "*.html" -exec sed -i 's|</head>|  <link rel="stylesheet" href="css/custom.css">\n</head>|' {} \;
       
       - name: Setup Pages
         id: pages
