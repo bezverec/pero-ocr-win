@@ -110,6 +110,44 @@ class Region:
     lines: List[Line]
 
 
+def _compute_region_bbox(tr: ET.Element) -> Tuple[int, int, int, int]:
+    """Compute bounding box for a TextRegion element."""
+    coords = find_child(tr, "Coords")
+    if coords is not None:
+        bb = bbox_from_points(parse_points(coords.attrib.get("points")))
+        if bb:
+            return bb
+
+    # fallback bbox from lines if region coords missing
+    xs, ys, xe, ye = [], [], [], []
+    for tl in iter_desc(tr, "TextLine"):
+        c = find_child(tl, "Coords")
+        if c is None:
+            continue
+        b = bbox_from_points(parse_points(c.attrib.get("points")))
+        if not b:
+            continue
+        xs.append(b[0])
+        ys.append(b[1])
+        xe.append(b[2])
+        ye.append(b[3])
+
+    if xs:
+        return (min(xs), min(ys), max(xe), max(ye))
+    return (0, 0, 0, 0)
+
+
+def _extract_lines_from_region(tr: ET.Element) -> List[Line]:
+    """Extract all text lines from a TextRegion element."""
+    lines: List[Line] = []
+    for tl in iter_desc(tr, "TextLine"):
+        txt = get_textline_text(tl)
+        if not txt:
+            continue
+        lines.append(Line(y=get_line_y(tl), x=get_line_x(tl), text=txt))
+    return lines
+
+
 def extract_regions(root: ET.Element) -> List[Region]:
     # PAGE root: PcGts/Page
     page = None
@@ -123,36 +161,8 @@ def extract_regions(root: ET.Element) -> List[Region]:
     regions: List[Region] = []
     for tr in iter_desc(page, "TextRegion"):
         rid = tr.attrib.get("id", "")
-        coords = find_child(tr, "Coords")
-        bb = None
-        if coords is not None:
-            bb = bbox_from_points(parse_points(coords.attrib.get("points")))
-        if not bb:
-            # fallback bbox from lines if region coords missing
-            xs, ys, xe, ye = [], [], [], []
-            for tl in iter_desc(tr, "TextLine"):
-                c = find_child(tl, "Coords")
-                if c is None:
-                    continue
-                b = bbox_from_points(parse_points(c.attrib.get("points")))
-                if not b:
-                    continue
-                xs.append(b[0])
-                ys.append(b[1])
-                xe.append(b[2])
-                ye.append(b[3])
-            if xs:
-                bb = (min(xs), min(ys), max(xe), max(ye))
-            else:
-                bb = (0, 0, 0, 0)
-
-        x0, y0, x1, y1 = bb
-        lines: List[Line] = []
-        for tl in iter_desc(tr, "TextLine"):
-            txt = get_textline_text(tl)
-            if not txt:
-                continue
-            lines.append(Line(y=get_line_y(tl), x=get_line_x(tl), text=txt))
+        x0, y0, x1, y1 = _compute_region_bbox(tr)
+        lines = _extract_lines_from_region(tr)
 
         if lines:
             regions.append(Region(id=rid, x0=x0, y0=y0, x1=x1, y1=y1, lines=lines))
