@@ -1,0 +1,46 @@
+name: Codacy Security Scan
+
+on:
+  push:
+    branches: ["master"]
+  pull_request:
+    branches: ["master"]
+  schedule:
+    - cron: "21 12 * * 0"
+
+permissions:
+  contents: read
+
+jobs:
+  codacy-security-scan:
+    name: Codacy Security Scan
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      security-events: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run Codacy Analysis CLI (Bandit, win-scripts only)
+        uses: codacy/codacy-analysis-cli-action@d840f886c4bd4edc059706d09c6a1586111c540b
+        with:
+          # If you have a Codacy project token, keep this.
+          # If you DON'T have it, remove this line.
+          # project-token: ${{ secrets.CODACY_PROJECT_TOKEN }}
+
+          tool: bandit
+          directory: ${{ github.workspace }}/win-scripts
+
+          format: sarif
+          output: results.sarif
+          verbose: true
+          gh-code-scanning-compat: true
+          max-allowed-issues: 2147483647
+
+      - name: Upload SARIF results
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: results.sarif
