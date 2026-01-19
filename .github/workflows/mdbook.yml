@@ -58,7 +58,7 @@ jobs:
           echo 'src = "src"' >> mdbook.toml
           echo '' >> mdbook.toml
           echo '[build]' >> mdbook.toml
-          echo 'build-dir = "../_site"' >> mdbook.toml
+          echo 'build-dir = "_site"' >> mdbook.toml  # Změněno na relativní cestu
           echo 'create-missing = true' >> mdbook.toml
           echo '' >> mdbook.toml
           echo '[output.html]' >> mdbook.toml
@@ -76,7 +76,23 @@ jobs:
           export PATH="$HOME/.cargo/bin:$PATH"
           cd win-docs
           mdbook build
-          touch ../_site/.nojekyll
+      
+      - name: Add .nojekyll and prepare for deployment
+        run: |
+          # Přesunout výstup z win-docs/_site do kořenového _site
+          mkdir -p _site
+          cp -r win-docs/_site/* _site/ 2>/dev/null || true
+          
+          # Přidat .nojekyll soubor
+          touch _site/.nojekyll
+          
+          # Pokud _site je prázdný (mdbook možná vytvořil výstup jinde)
+          if [ ! "$(ls -A _site)" ]; then
+            echo "Checking for output in other locations..."
+            # Hledat mdbook output
+            find . -name "book" -type d | head -1 | xargs -I {} cp -r {} _site/ 2>/dev/null || true
+            find . -name "_site" -type d | head -1 | xargs -I {} cp -r {}/* _site/ 2>/dev/null || true
+          fi
       
       - name: Setup Pages
         id: pages
