@@ -1,6 +1,6 @@
 # Windows Installation Guide (pero-ocr-win)
 
-This document describes **step-by-step installation of PERO OCR on Windows 10/11**
+This document describes **step-by-step installation of PERO OCR on Windows 11**
 using the `pero-ocr-win` fork.  
 The guide assumes **Python-only usage (no Docker, no GUI)**.
 
@@ -121,6 +121,7 @@ Put input images into `in` (JPG, PNG, TIFF).
 
 Use **Windows-compatible script**:
 
+For CPU:
 ```powershell
 python win-scripts\win-parse_folder.py `
   --config C:\temp\pero\models\pero_eu_cz_print_newspapers_2022-09-26\config.ini `
@@ -144,8 +145,7 @@ python win-scripts\win-parse_folder.py `
 ## 10. Outputs
 
 For each image:
-- `*.xml` – ALTO XML (default)
-- `*.page.xml` – PageXML (if enabled)
+- `*.xml` – PageXML (default)
 
 Further processing is described in:
 - `alto-versions.md`
@@ -162,4 +162,5 @@ Further processing is described in:
 ---
 
 Next document:
-**gpu-cuda-pytorch.md**
+[**gpu-cuda-pytorch.md**](gpu-cuda-pytorch.md)
+
