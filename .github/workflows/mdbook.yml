@@ -51,10 +51,10 @@ jobs:
             echo 'title = "Pero OCR Windows - Documentation"' >> mdbook.toml
             echo 'description = "Windows-focused fork of PERO OCR project"' >> mdbook.toml
             echo 'authors = ["bezverec"]' >> mdbook.toml
-            echo 'src = "win-docs"' >> mdbook.toml
+            echo 'src = "."' >> mdbook.toml  # Změněno z "win-docs" na "."
             echo '' >> mdbook.toml
             echo '[build]' >> mdbook.toml
-            echo 'build-dir = "_site"' >> mdbook.toml
+            echo 'build-dir = "../_site"' >> mdbook.toml  # Změněno na relativní cestu
             echo 'create-missing = true' >> mdbook.toml
             echo '' >> mdbook.toml
             echo '[output.html]' >> mdbook.toml
@@ -71,17 +71,19 @@ jobs:
       - name: Build with mdBook
         run: |
           export PATH="$HOME/.cargo/bin:$PATH"
+          # Spustit mdbook z adresáře win-docs
+          cd win-docs
           mdbook build
           
           # Přidat .nojekyll soubor pro GitHub Pages
-          touch _site/.nojekyll
+          touch ../_site/.nojekyll
       
       - name: Add custom CSS
         run: |
           # Vytvořit složku pro CSS
           mkdir -p _site/css
           
-          # Vytvořit custom CSS soubor bez HEREDOC
+          # Vytvořit custom CSS soubor
           echo '/* Custom styles for Pero OCR documentation */' > _site/css/custom.css
           echo ':root {' >> _site/css/custom.css
           echo '  --md-primary-fg-color: #238636;' >> _site/css/custom.css
