@@ -22,9 +22,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       
-      - name: Create SUMMARY.md if missing
+      - name: Setup mdBook structure
         run: |
-          cd win-docs
+          # Vytvořit src adresář v win-docs (to mdBook očekává)
+          mkdir -p win-docs/src
+          
+          # Přesunout všechny .md soubory do src adresáře
+          cp win-docs/*.md win-docs/src/ 2>/dev/null || true
+          
+          # Vytvořit SUMMARY.md ve src adresáři
+          cd win-docs/src
           if [ ! -f SUMMARY.md ]; then
             echo '# Summary' > SUMMARY.md
             echo '' >> SUMMARY.md
@@ -44,23 +51,22 @@ jobs:
             echo '- [About this fork and upstream project](README-upstream.md)' >> SUMMARY.md
           fi
       
-      - name: Create mdbook.toml if missing
+      - name: Create mdbook.toml
         run: |
-          if [ ! -f mdbook.toml ]; then
-            echo '[book]' > mdbook.toml
-            echo 'title = "Pero OCR Windows - Documentation"' >> mdbook.toml
-            echo 'description = "Windows-focused fork of PERO OCR project"' >> mdbook.toml
-            echo 'authors = ["bezverec"]' >> mdbook.toml
-            echo 'src = "."' >> mdbook.toml  # Změněno z "win-docs" na "."
-            echo '' >> mdbook.toml
-            echo '[build]' >> mdbook.toml
-            echo 'build-dir = "../_site"' >> mdbook.toml  # Změněno na relativní cestu
-            echo 'create-missing = true' >> mdbook.toml
-            echo '' >> mdbook.toml
-            echo '[output.html]' >> mdbook.toml
-            echo 'default-theme = "dark"' >> mdbook.toml
-            echo 'preferred-dark-theme = "dark"' >> mdbook.toml
-          fi
+          # Vytvořit mdbook.toml v kořenovém adresáři
+          echo '[book]' > mdbook.toml
+          echo 'title = "Pero OCR Windows - Documentation"' >> mdbook.toml
+          echo 'description = "Windows-focused fork of PERO OCR project"' >> mdbook.toml
+          echo 'authors = ["bezverec"]' >> mdbook.toml
+          echo 'src = "win-docs/src"' >> mdbook.toml  # Cesta k src adresáři
+          echo '' >> mdbook.toml
+          echo '[build]' >> mdbook.toml
+          echo 'build-dir = "_site"' >> mdbook.toml
+          echo 'create-missing = true' >> mdbook.toml
+          echo '' >> mdbook.toml
+          echo '[output.html]' >> mdbook.toml
+          echo 'default-theme = "dark"' >> mdbook.toml
+          echo 'preferred-dark-theme = "dark"' >> mdbook.toml
       
       - name: Install mdBook
         run: |
@@ -71,12 +77,10 @@ jobs:
       - name: Build with mdBook
         run: |
           export PATH="$HOME/.cargo/bin:$PATH"
-          # Spustit mdbook z adresáře win-docs
-          cd win-docs
           mdbook build
           
           # Přidat .nojekyll soubor pro GitHub Pages
-          touch ../_site/.nojekyll
+          touch _site/.nojekyll
       
       - name: Add custom CSS
         run: |
