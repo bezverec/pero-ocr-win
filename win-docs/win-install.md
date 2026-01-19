@@ -163,7 +163,3 @@ Further processing is described in:
 
 Next document:
 [**gpu-cuda-pytorch.md**](gpu-cuda-pytorch.md)
-
-
-
-
