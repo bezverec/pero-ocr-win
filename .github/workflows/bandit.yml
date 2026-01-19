@@ -33,7 +33,7 @@ jobs:
 
       - name: Run Bandit (SARIF)
         run: |
-          # Scan only your Windows-specific scripts (recommended)
+          Scan only your Windows-specific scripts (recommended)
           bandit -r win-scripts -f sarif -o bandit.sarif || true
 
           # If you want to scan everything, use this instead:
