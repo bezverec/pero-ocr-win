@@ -33,3 +33,4 @@ jobs:
             --disable=missing-module-docstring \
             --disable=missing-function-docstring \
             --disable=missing-class-docstring
+            --fail-under=9.0
